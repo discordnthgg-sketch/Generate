@@ -380,6 +380,7 @@
             max-height: 500px;
             border-radius: var(--radius);
             display: none;
+            object-fit: contain;
         }
         
         .generated-image.active {
@@ -653,6 +654,12 @@
             color: var(--error);
         }
         
+        .message.info {
+            background: rgba(59, 130, 246, 0.15);
+            border-left: 4px solid #3b82f6;
+            color: #3b82f6;
+        }
+        
         /* Animations */
         @keyframes fadeIn {
             from { opacity: 0; }
@@ -712,9 +719,9 @@
                 <textarea class="prompt-input" id="promptInput" placeholder="Exemple: Une librairie abandonnée sur une planète étrangère, aquarelle mélancolique..."></textarea>
                 
                 <div class="examples">
+                    <div class="example-tag" data-prompt="Un chat japonais qui mange des nouilles, style manga kawaii">Chat mangeur de nouilles</div>
                     <div class="example-tag" data-prompt="Un vieux robot jardinant sur Mars, atelier d'illustration">Robot jardinier martien</div>
                     <div class="example-tag" data-prompt="Une librairie flottante dans les nuages, estampe japonaise">Librairie flottante</div>
-                    <div class="example-tag" data-prompt="Une fête foraine sous l'océan, neon noir années 80">Fête foraine sous-marine</div>
                     <div class="example-tag" data-prompt="Un samouraï dans une station spatiale abandonnée, croquis au crayon">Samouraï spatial</div>
                 </div>
             </div>
@@ -851,7 +858,8 @@
             currentColors: [],
             currentImageUrl: '',
             currentText: '',
-            currentPrompt: ''
+            currentPrompt: '',
+            visualizerInterval: null
         };
         
         // Éléments DOM
@@ -878,59 +886,76 @@
         const githubLink = document.getElementById('githubLink');
         const aboutLink = document.getElementById('aboutLink');
         
-        // Phrases poétiques pré-définies pour différents thèmes
+        // Base de données d'images pour différents thèmes (URL Unsplash)
+        const imageDatabase = {
+            // Images pour "chat japonais qui mange des nouilles"
+            "chat": [
+                "https://images.unsplash.com/photo-1514888286974-6d03bde4ba4f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+                "https://images.unsplash.com/photo-1513360371669-4adf3dd7dff8?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+                "https://images.unsplash.com/photo-1573866926487-a1865558a9cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+            ],
+            // Images pour "robot jardinier martien"
+            "robot": [
+                "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+                "https://images.unsplash.com/photo-1535378917042-10a22c95931a?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+                "https://images.unsplash.com/photo-1581094794329-c8112a89af12?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+            ],
+            // Images pour "librairie flottante"
+            "librairie": [
+                "https://images.unsplash.com/photo-1544716278-e513176f20b5?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+                "https://images.unsplash.com/photo-1507842217343-583bb7270b66?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+                "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+            ],
+            // Images pour "samouraï spatial"
+            "samouraï": [
+                "https://images.unsplash.com/photo-1542751371-adc38448a05e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+                "https://images.unsplash.com/photo-1534447677768-be436bb09401?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+                "https://images.unsplash.com/photo-1518709268805-4e9042af2176?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+            ],
+            // Images par défaut
+            "default": [
+                "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+                "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+                "https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+            ]
+        };
+        
+        // Phrases poétiques adaptées aux prompts
         const poeticPhrases = {
-            // Thèmes généraux
-            spatial: [
-                "Dans le silence infini du cosmos, les étoiles racontent des histoires oubliées. Chaque étincelle est un souvenir, chaque constellation un poème gravé dans la nuit éternelle.",
-                "L'espace n'est pas un vide, mais un océan de possibilités. Les planètes dansent une valse silencieuse, orchestrée par la gravité, musique des sphères que seuls les rêveurs peuvent entendre.",
-                "Au-delà des nuages de poussière interstellaire, des mondes naissent et meurent dans un spectacle cosmique. Nous ne sommes que des passagers éphémères sur ce vaisseau qu'est la Terre."
+            "chat": [
+                "Un petit félin du Japon, dégustant des nouilles avec une grâce unique. Ses moustaches frémissent au rythme des baguettes, dans un moment de pur bonheur culinaire.",
+                "Sous les cerisiers en fleurs, un chat savoure ses nouilles avec délicatesse. Chaque bouchée est une célébration des saveurs, chaque mouvement une danse de satisfaction.",
+                "Le chat, maître de l'art du ramen, plonge son museau dans le bol fumant. Un instant de paix où le temps s'arrête, où seul compte le parfum des nouilles et le ronronnement du contentement."
             ],
-            nature: [
-                "La forêt respire lentement, chaque feuille un poumon vert. Les racines profondes murmurent les secrets de la terre, tandis que la canopée chuchote avec le vent.",
-                "Le ruisseau serpente à travers la mousse comme une pensée fugace. L'eau caresse les pierres polies par le temps, sculptant des mémoires liquides dans le lit de la terre.",
-                "Les montagnes, gardiennes silencieuses du temps, portent les cicatrices des siècles sur leurs flancs de pierre. Leurs sommets touchent le ciel, ponts entre la terre et l'infini."
+            "robot": [
+                "Sur le sol rouge de Mars, un vieux robot cultive patiemment un jardin extraterrestre. Ses gestes mécaniques sont empreints d'une tendresse surprenante pour ces plantes venues d'ailleurs.",
+                "Le robot jardinier, dernier témoin d'une colonie oubliée, arrose des fleurs martiennes aux couleurs irréelles. Dans le silence de la planète rouge, c'est un acte d'espoir, une affirmation de vie.",
+                "Parmi les roches rouges et la poussière cosmique, une main métallique caresse délicatement une pousse verte. Le contraste est saisissant : la froideur du métal au service de la chaleur de la vie."
             ],
-            urbain: [
-                "La ville bat au rythme de mille cœurs, lumière liquide coulant dans les artères de béton. Chaque fenêtre éclairée est une histoire qui s'écrit dans la nuit.",
-                "Les rues sont des veines, les bâtiments des organes, et les habitants le sang qui fait vivre cette créature de verre et d'acier. La ville respire, dort, rêve et se réveille sans cesse.",
-                "Sous les néons qui pleurent leur lumière colorée, la ville dévoile son âme nocturne. Les ombres dansent sur le trottoir, compagnons silencieux des promeneurs solitaires."
+            "librairie": [
+                "Flottant parmi les nuages, cette librairie défie les lois de la gravité. Les livres y volent littéralement des étagères, leurs pages tournant au gré des courants aériens.",
+                "Dans ce sanctuaire céleste, les mots ont le poids des nuages et la légèreté des rêves. Chaque livre ouvert libère des histoires qui se mêlent aux vapeurs du ciel.",
+                "Une architecture de bois et de papier qui danse avec les nuages. Ici, la lecture est une expérience aérienne, où chaque page tournée fait frémir l'édifice tout entier."
             ],
-            fantastique: [
-                "Les créatures des légendes se cachent dans les interstices de la réalité, attendant le crépuscule pour danser entre les mondes. La magie est le souffle de l'imagination donnant vie à l'impossible.",
-                "Les portes entre les dimensions sont faites de rêves et de souvenirs. Il suffit de croire assez fort pour les voir s'ouvrir, révélant des paysages tissés de mystère et d'émerveillement.",
-                "Dans les royaumes oubliés, le temps s'écoule comme du miel épais. Les châteaux flottent sur des nuages de possibilités, et les rivières chantent des mélodies venues d'ailleurs."
+            "samouraï": [
+                "Dans le silence métallique d'une station spatiale abandonnée, un samouraï médite. Son armure traditionnelle contraste étrangement avec les écrans holographiques défectueux.",
+                "L'épée du samouraï reflète les lumières des étoiles à travers le dôme fissuré. Entre honneur ancestral et futur déchu, il garde un poste que l'humanité a oublié.",
+                "Parmi les débris technologiques, la silhouette du guerrier se découpe contre la vue imprenable sur la Terre lointaine. Un gardien entre deux mondes, deux époques, deux réalités."
             ],
             // Phrases par défaut
-            default: [
+            "default": [
                 "L'univers que vous avez imaginé prend forme, mélangeant réalité et songe. Chaque détail est une note dans la symphonie de votre création, chaque couleur un mot dans le poème du visible.",
                 "Entre le réel et l'imaginaire, votre vision s'incarne. Les frontières s'estompent, laissant place à un monde où tout est possible, où chaque élément raconte une partie de l'histoire.",
                 "Votre imagination a tissé cette réalité alternative, où les règles de notre monde se plient aux possibilités infinies de la créativité. Ici, tout est à la fois familier et merveilleusement étrange."
             ]
         };
         
-        // Sons pré-enregistrés (seront générés à la volée)
-        const soundPresets = {
-            spatial: ['synth_pad', 'atmospheric_drone', 'cosmic_winds'],
-            nature: ['forest_ambience', 'gentle_stream', 'bird_songs'],
-            urbain: ['city_traffic', 'rain_on_window', 'distant_murmur'],
-            fantastique: ['magical_chimes', 'enchanted_forest', 'mystical_echoes'],
-            default: ['ambient_pad', 'soft_waves', 'etheral_tones']
-        };
-        
-        // Images de secours pour démo
-        const fallbackImages = [
-            'https://images.unsplash.com/photo-1446776653964-20c1d3a81b06?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-            'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w-800&q=80',
-            'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-            'https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-        ];
-        
         // Initialisation
         document.addEventListener('DOMContentLoaded', function() {
             initParticles();
             initEventListeners();
             setTheme(appState.currentTheme);
+            initAudioVisualizer();
             
             // Lien GitHub
             githubLink.href = "https://github.com";
@@ -1098,12 +1123,13 @@
             showMessage("Création de votre univers...", "info");
             
             try {
-                // Générer les éléments en parallèle (simulation)
-                await Promise.all([
-                    generateImage(prompt),
-                    generateAudio(prompt),
-                    generateText(prompt)
-                ]);
+                // Détecter le type de prompt
+                const promptType = detectPromptType(prompt);
+                
+                // Générer les éléments en séquence
+                await generateImage(prompt, promptType);
+                await generateText(prompt, promptType);
+                await generateAudio(prompt, promptType);
                 
                 // Afficher les résultats
                 setTimeout(() => {
@@ -1116,7 +1142,10 @@
                     showMessage("Votre univers a été créé avec succès !", "success");
                     
                     // Extraire les couleurs de l'image
-                    extractColors();
+                    setTimeout(() => {
+                        extractColors();
+                    }, 500);
+                    
                 }, 1500);
                 
             } catch (error) {
@@ -1134,81 +1163,67 @@
             }
         }
         
-        // Générer une image
-        async function generateImage(prompt) {
-            showMessage("Génération de l'image...", "info");
-            
-            // Simuler un délai de génération
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // Dans une vraie implémentation, on utiliserait une API sans clé comme Craiyon
-            // Ici, nous simulons avec une image Unsplash aléatoire basée sur le prompt
-            
-            // Déterminer une catégorie basée sur le prompt
-            let category = 'nature';
+        // Détecter le type de prompt
+        function detectPromptType(prompt) {
             const promptLower = prompt.toLowerCase();
             
-            if (promptLower.includes('espace') || promptLower.includes('planète') || promptLower.includes('cosmos') || promptLower.includes('martien')) {
-                category = 'spatial';
-            } else if (promptLower.includes('ville') || promptLower.includes('urbain') || promptLower.includes('métropole') || promptLower.includes('rue')) {
-                category = 'urbain';
-            } else if (promptLower.includes('fantastique') || promptLower.includes('magie') || promptLower.includes('enchante') || promptLower.includes('mythique')) {
-                category = 'fantastique';
+            if (promptLower.includes('chat') || promptLower.includes('félin') || promptLower.includes('japonais') || promptLower.includes('nouille')) {
+                return 'chat';
+            } else if (promptLower.includes('robot') || promptLower.includes('martien') || promptLower.includes('mars')) {
+                return 'robot';
+            } else if (promptLower.includes('librairie') || promptLower.includes('livre') || promptLower.includes('bibliothèque')) {
+                return 'librairie';
+            } else if (promptLower.includes('samouraï') || promptLower.includes('guerrier') || promptLower.includes('épée')) {
+                return 'samouraï';
             }
             
-            // Utiliser une image de démo appropriée
-            const demoImages = {
-                spatial: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-                nature: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-                urbain: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-                fantastique: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-            };
-            
-            const imageUrl = demoImages[category] || demoImages.nature;
-            appState.currentImageUrl = imageUrl;
-            
-            // Afficher l'image
-            imagePlaceholder.style.display = 'none';
-            generatedImage.src = imageUrl;
-            generatedImage.classList.add('active');
-            
-            return imageUrl;
+            return 'default';
         }
         
-        // Générer une ambiance audio
-        async function generateAudio(prompt) {
-            showMessage("Création de l'ambiance sonore...", "info");
+        // Générer une image adaptée au prompt
+        async function generateImage(prompt, promptType) {
+            showMessage("Génération de l'image...", "info");
             
             // Simuler un délai de génération
             await new Promise(resolve => setTimeout(resolve, 800));
             
-            // Déterminer le type d'ambiance basé sur le prompt
-            let soundType = 'default';
-            const promptLower = prompt.toLowerCase();
+            // Sélectionner une image aléatoire dans la catégorie appropriée
+            const images = imageDatabase[promptType] || imageDatabase.default;
+            const randomImage = images[Math.floor(Math.random() * images.length)];
             
-            if (promptLower.includes('pluie') || promptLower.includes('orage')) {
-                soundType = 'nature';
-                audioInfo.textContent = "Ambiance pluvieuse et orageuse";
-            } else if (promptLower.includes('forêt') || promptLower.includes('nature')) {
-                soundType = 'nature';
-                audioInfo.textContent = "Ambiance de forêt avec oiseaux et feuilles";
-            } else if (promptLower.includes('ville') || promptLower.includes('métropole')) {
-                soundType = 'urbain';
-                audioInfo.textContent = "Bruits de ville et murmures urbains";
-            } else if (promptLower.includes('espace') || promptLower.includes('cosmos')) {
-                soundType = 'spatial';
-                audioInfo.textContent = "Sons synthétiques et pads atmosphériques";
-            } else {
-                audioInfo.textContent = "Ambiance générée à partir de votre description";
+            appState.currentImageUrl = randomImage;
+            
+            // Afficher l'image
+            imagePlaceholder.style.display = 'none';
+            generatedImage.src = randomImage;
+            generatedImage.classList.add('active');
+            
+            return randomImage;
+        }
+        
+        // Générer une ambiance audio qui fonctionne
+        async function generateAudio(prompt, promptType) {
+            showMessage("Création de l'ambiance sonore...", "info");
+            
+            // Simuler un délai de génération
+            await new Promise(resolve => setTimeout(resolve, 600));
+            
+            // Déterminer le type d'ambiance
+            let soundDescription = "Ambiance apaisante et contemplative";
+            if (promptType === 'chat') {
+                soundDescription = "Ambiance japonaise douce avec sons de cuisine";
+            } else if (promptType === 'robot') {
+                soundDescription = "Sons mécaniques doux et bruits de vent martien";
+            } else if (promptType === 'librairie') {
+                soundDescription = "Bruits de pages tournées et murmures légers";
+            } else if (promptType === 'samouraï') {
+                soundDescription = "Sons de métal léger et ambiance spatiale calme";
             }
             
-            // Initialiser l'audio si nécessaire
-            if (!appState.audioContext) {
-                appState.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
+            audioInfo.textContent = soundDescription;
             
-            // Créer un son synthétique basé sur le type
-            createSyntheticSound(soundType);
+            // Créer un vrai son synthétique qui fonctionne
+            createWorkingAudio(promptType);
             
             // Activer le bouton de téléchargement
             audioDownload.href = "#";
@@ -1218,110 +1233,187 @@
             };
         }
         
-        // Créer un son synthétique
-        function createSyntheticSound(type) {
-            const audioContext = appState.audioContext;
-            
+        // Créer un vrai audio qui fonctionne
+        function createWorkingAudio(type) {
             // Arrêter tout son existant
             if (appState.currentAudio) {
-                appState.currentAudio.stop();
+                stopAudio();
             }
             
-            // Créer un nouveau son
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
+            // Initialiser l'audio context
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            appState.audioContext = new AudioContext();
+            
+            // Créer des nœuds audio
+            const oscillator1 = appState.audioContext.createOscillator();
+            const oscillator2 = appState.audioContext.createOscillator();
+            const gainNode = appState.audioContext.createGain();
+            const filter = appState.audioContext.createBiquadFilter();
             
             // Configurer selon le type
-            let frequency = 220;
-            let waveType = 'sine';
+            let freq1 = 220;
+            let freq2 = 440;
+            let waveType1 = 'sine';
+            let waveType2 = 'triangle';
             
             switch(type) {
-                case 'spatial':
-                    frequency = 110;
-                    waveType = 'sine';
+                case 'chat':
+                    freq1 = 330;
+                    freq2 = 660;
+                    waveType1 = 'sine';
+                    waveType2 = 'sine';
                     break;
-                case 'nature':
-                    frequency = 440;
-                    waveType = 'triangle';
+                case 'robot':
+                    freq1 = 110;
+                    freq2 = 220;
+                    waveType1 = 'sawtooth';
+                    waveType2 = 'square';
                     break;
-                case 'urbain':
-                    frequency = 330;
-                    waveType = 'square';
+                case 'librairie':
+                    freq1 = 176;
+                    freq2 = 352;
+                    waveType1 = 'sine';
+                    waveType2 = 'triangle';
                     break;
-                case 'fantastique':
-                    frequency = 550;
-                    waveType = 'sawtooth';
+                case 'samouraï':
+                    freq1 = 147;
+                    freq2 = 294;
+                    waveType1 = 'sawtooth';
+                    waveType2 = 'sine';
                     break;
                 default:
-                    frequency = 220;
-                    waveType = 'sine';
+                    freq1 = 220;
+                    freq2 = 440;
+                    waveType1 = 'sine';
+                    waveType2 = 'triangle';
             }
             
-            oscillator.type = waveType;
-            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+            oscillator1.type = waveType1;
+            oscillator1.frequency.setValueAtTime(freq1, appState.audioContext.currentTime);
             
-            // Modulation pour un son plus intéressant
-            const lfo = audioContext.createOscillator();
-            lfo.frequency.setValueAtTime(0.5, audioContext.currentTime);
+            oscillator2.type = waveType2;
+            oscillator2.frequency.setValueAtTime(freq2, appState.audioContext.currentTime);
             
-            const lfoGain = audioContext.createGain();
-            lfoGain.gain.setValueAtTime(10, audioContext.currentTime);
+            // Configurer le filtre
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(1000, appState.audioContext.currentTime);
             
-            lfo.connect(lfoGain);
-            lfoGain.connect(oscillator.frequency);
-            
-            // Enveloppe de gain
-            gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-            gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.5);
+            // Configurer le gain (volume)
+            gainNode.gain.setValueAtTime(0.1, appState.audioContext.currentTime);
             
             // Connexions
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
+            oscillator1.connect(filter);
+            oscillator2.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(appState.audioContext.destination);
             
             // Démarrer les oscillateurs
-            oscillator.start();
-            lfo.start();
+            oscillator1.start();
+            oscillator2.start();
+            
+            // Mettre en pause initialement
+            appState.audioContext.suspend();
             
             // Stocker pour contrôle ultérieur
             appState.currentAudio = {
-                oscillator: oscillator,
+                oscillator1: oscillator1,
+                oscillator2: oscillator2,
                 gain: gainNode,
-                lfo: lfo,
-                lfoGain: lfoGain
+                filter: filter,
+                isPlaying: false
             };
             
-            // Mettre à jour l'état
-            appState.isPlaying = false;
+            // Mettre à jour l'interface
             playBtn.disabled = false;
             stopBtn.disabled = true;
+            playBtn.innerHTML = '<i class="fas fa-play"></i>';
             
-            // Mettre à jour l'interface
+            // Mettre à jour le visualiseur
             updateAudioVisualizer();
         }
         
-        // Générer un texte poétique
-        async function generateText(prompt) {
+        // Initialiser le visualiseur audio
+        function initAudioVisualizer() {
+            const canvas = audioVisualizer;
+            const ctx = canvas.getContext('2d');
+            
+            function resizeCanvas() {
+                canvas.width = canvas.offsetWidth;
+                canvas.height = canvas.offsetHeight;
+            }
+            
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+        }
+        
+        // Mettre à jour le visualiseur audio
+        function updateAudioVisualizer() {
+            const canvas = audioVisualizer;
+            const ctx = canvas.getContext('2d');
+            
+            // Nettoyer l'intervalle précédent
+            if (appState.visualizerInterval) {
+                clearInterval(appState.visualizerInterval);
+            }
+            
+            // Animer le visualiseur
+            appState.visualizerInterval = setInterval(() => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Dessiner le fond
+                ctx.fillStyle = appState.currentTheme === 'dark' ? 'rgba(26, 26, 46, 0.7)' : 'rgba(233, 236, 239, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Dessiner les barres du visualiseur
+                const barCount = 32;
+                const barWidth = canvas.width / barCount;
+                const isPlaying = appState.isPlaying;
+                
+                for (let i = 0; i < barCount; i++) {
+                    // Hauteur dynamique avec animation
+                    let barHeight;
+                    if (isPlaying) {
+                        // Animation plus active quand l'audio joue
+                        const time = Date.now() / 1000;
+                        const noise = Math.sin(time * 2 + i * 0.3) * 0.5 + 0.5;
+                        barHeight = noise * (canvas.height * 0.6) + (canvas.height * 0.1);
+                    } else {
+                        // Animation calme quand l'audio est en pause
+                        const time = Date.now() / 2000;
+                        const wave = Math.sin(time + i * 0.2) * 0.3 + 0.5;
+                        barHeight = wave * (canvas.height * 0.3) + (canvas.height * 0.2);
+                    }
+                    
+                    // Position
+                    const x = i * barWidth;
+                    const y = canvas.height - barHeight;
+                    
+                    // Dégradé de couleur
+                    const gradient = ctx.createLinearGradient(0, y, 0, canvas.height);
+                    const hue = (i * 10 + Date.now() / 100) % 360;
+                    gradient.addColorStop(0, `hsla(${hue}, 70%, 60%, 0.8)`);
+                    gradient.addColorStop(1, `hsla(${(hue + 60) % 360}, 70%, 40%, 0.4)`);
+                    
+                    // Dessiner la barre
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x + 1, y, barWidth - 2, barHeight);
+                    
+                    // Effet de brillance
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                    ctx.fillRect(x + 1, y, barWidth - 2, 2);
+                }
+            }, 50);
+        }
+        
+        // Générer un texte poétique adapté
+        async function generateText(prompt, promptType) {
             showMessage("Écriture de l'évocation poétique...", "info");
             
             // Simuler un délai de génération
             await new Promise(resolve => setTimeout(resolve, 600));
             
-            // Déterminer la catégorie
-            let category = 'default';
-            const promptLower = prompt.toLowerCase();
-            
-            if (promptLower.includes('espace') || promptLower.includes('planète') || promptLower.includes('cosmos') || promptLower.includes('martien')) {
-                category = 'spatial';
-            } else if (promptLower.includes('forêt') || promptLower.includes('nature') || promptLower.includes('jardin')) {
-                category = 'nature';
-            } else if (promptLower.includes('ville') || promptLower.includes('urbain') || promptLower.includes('rue')) {
-                category = 'urbain';
-            } else if (promptLower.includes('fantastique') || promptLower.includes('magie') || promptLower.includes('enchante') || promptLower.includes('mythique')) {
-                category = 'fantastique';
-            }
-            
-            // Sélectionner une phrase aléatoire de la catégorie
-            const phrases = poeticPhrases[category] || poeticPhrases.default;
+            // Sélectionner une phrase aléatoire de la catégorie appropriée
+            const phrases = poeticPhrases[promptType] || poeticPhrases.default;
             const randomText = phrases[Math.floor(Math.random() * phrases.length)];
             
             appState.currentText = randomText;
@@ -1340,8 +1432,13 @@
             
             const colorThief = new ColorThief();
             const img = new Image();
+            
+            // Gérer les problèmes CORS
             img.crossOrigin = "Anonymous";
-            img.src = appState.currentImageUrl;
+            
+            // Utiliser un proxy CORS pour Unsplash
+            const proxyUrl = 'https://corsproxy.io/?';
+            img.src = proxyUrl + encodeURIComponent(appState.currentImageUrl);
             
             img.onload = function() {
                 try {
@@ -1349,50 +1446,56 @@
                     appState.currentColors = palette;
                     
                     // Afficher la palette
-                    colorPalette.innerHTML = '';
+                    displayColorPalette(palette);
                     
-                    palette.forEach(color => {
-                        const hex = rgbToHex(color[0], color[1], color[2]);
-                        
-                        const colorItem = document.createElement('div');
-                        colorItem.className = 'color-item';
-                        
-                        const swatch = document.createElement('div');
-                        swatch.className = 'color-swatch';
-                        swatch.style.backgroundColor = hex;
-                        swatch.title = hex;
-                        
-                        const hexCode = document.createElement('div');
-                        hexCode.className = 'color-hex';
-                        hexCode.textContent = hex;
-                        hexCode.title = "Cliquer pour copier";
-                        
-                        // Copier au clic
-                        hexCode.addEventListener('click', function() {
-                            navigator.clipboard.writeText(hex).then(() => {
-                                showMessage(`Couleur ${hex} copiée !`, "success");
-                            });
-                        });
-                        
-                        colorItem.appendChild(swatch);
-                        colorItem.appendChild(hexCode);
-                        colorPalette.appendChild(colorItem);
-                    });
                 } catch (error) {
                     console.error("Erreur lors de l'extraction des couleurs:", error);
                     
-                    // Palette par défaut
-                    const defaultColors = [
-                        [124, 58, 237], // Violet
-                        [16, 185, 129], // Vert
-                        [245, 158, 11], // Orange
-                        [59, 130, 246], // Bleu
-                        [239, 68, 68]   // Rouge
-                    ];
+                    // Palette par défaut basée sur le thème
+                    const defaultPalettes = {
+                        'chat': [
+                            [255, 223, 186], // Peach
+                            [255, 179, 186], // Light pink
+                            [186, 225, 255], // Light blue
+                            [255, 255, 186], // Light yellow
+                            [186, 255, 201]  // Mint
+                        ],
+                        'robot': [
+                            [128, 128, 128], // Gray
+                            [178, 34, 34],   // Red
+                            [105, 105, 105], // Dim gray
+                            [169, 169, 169], // Dark gray
+                            [220, 220, 220]  // Gainsboro
+                        ],
+                        'default': [
+                            [124, 58, 237],  // Violet
+                            [16, 185, 129],  // Vert
+                            [245, 158, 11],  // Orange
+                            [59, 130, 246],  // Bleu
+                            [239, 68, 68]    // Rouge
+                        ]
+                    };
                     
-                    appState.currentColors = defaultColors;
-                    displayColorPalette(defaultColors);
+                    const palette = defaultPalettes[appState.promptType] || defaultPalettes.default;
+                    appState.currentColors = palette;
+                    displayColorPalette(palette);
                 }
+            };
+            
+            img.onerror = function() {
+                console.error("Erreur de chargement de l'image pour extraction des couleurs");
+                
+                // Palette par défaut
+                const defaultColors = [
+                    [124, 58, 237],  // Violet
+                    [16, 185, 129],  // Vert
+                    [245, 158, 11],  // Orange
+                    [59, 130, 246],  // Bleu
+                    [239, 68, 68]    // Rouge
+                ];
+                
+                appState.currentColors = defaultColors;
+                displayColorPalette(defaultColors);
             };
         }
         
@@ -1438,13 +1541,13 @@
             if (!appState.audioContext || !appState.currentAudio) return;
             
             if (appState.isPlaying) {
-                // Pause
+                // Mettre en pause
                 appState.audioContext.suspend();
                 playBtn.innerHTML = '<i class="fas fa-play"></i>';
                 stopBtn.disabled = false;
                 appState.isPlaying = false;
             } else {
-                // Play
+                // Jouer
                 appState.audioContext.resume();
                 playBtn.innerHTML = '<i class="fas fa-pause"></i>';
                 stopBtn.disabled = false;
@@ -1456,8 +1559,8 @@
             if (!appState.currentAudio) return;
             
             // Arrêter le son
-            appState.currentAudio.oscillator.stop();
-            appState.currentAudio.lfo.stop();
+            appState.currentAudio.oscillator1.stop();
+            appState.currentAudio.oscillator2.stop();
             
             // Réinitialiser
             appState.currentAudio = null;
@@ -1467,92 +1570,30 @@
             playBtn.innerHTML = '<i class="fas fa-play"></i>';
             playBtn.disabled = false;
             stopBtn.disabled = true;
-            
-            // Recréer le son si on veut le rejouer
-            if (appState.currentPrompt) {
-                const promptLower = appState.currentPrompt.toLowerCase();
-                let soundType = 'default';
-                
-                if (promptLower.includes('pluie') || promptLower.includes('orage')) {
-                    soundType = 'nature';
-                } else if (promptLower.includes('forêt') || promptLower.includes('nature')) {
-                    soundType = 'nature';
-                } else if (promptLower.includes('ville') || promptLower.includes('métropole')) {
-                    soundType = 'urbain';
-                } else if (promptLower.includes('espace') || promptLower.includes('cosmos')) {
-                    soundType = 'spatial';
-                }
-                
-                createSyntheticSound(soundType);
-            }
-        }
-        
-        // Mettre à jour le visualiseur audio
-        function updateAudioVisualizer() {
-            const canvas = audioVisualizer;
-            const ctx = canvas.getContext('2d');
-            
-            canvas.width = canvas.offsetWidth;
-            canvas.height = canvas.offsetHeight;
-            
-            function draw() {
-                // Effacer le canvas
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                
-                // Dessiner le fond
-                ctx.fillStyle = appState.currentTheme === 'dark' ? 'rgba(26, 26, 46, 0.7)' : 'rgba(233, 236, 239, 0.7)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                // Dessiner les barres du visualiseur
-                const barCount = 64;
-                const barWidth = canvas.width / barCount;
-                const isPlaying = appState.isPlaying;
-                
-                for (let i = 0; i < barCount; i++) {
-                    // Hauteur aléatoire avec animation si en lecture
-                    let barHeight;
-                    if (isPlaying) {
-                        barHeight = Math.random() * (canvas.height * 0.7) + (canvas.height * 0.1);
-                    } else {
-                        barHeight = Math.sin(Date.now() / 1000 + i * 0.2) * (canvas.height * 0.2) + (canvas.height * 0.3);
-                    }
-                    
-                    // Position
-                    const x = i * barWidth;
-                    const y = canvas.height - barHeight;
-                    
-                    // Dégradé de couleur
-                    const gradient = ctx.createLinearGradient(0, y, 0, canvas.height);
-                    gradient.addColorStop(0, `rgba(124, 58, 237, ${0.7 + Math.random() * 0.3})`);
-                    gradient.addColorStop(1, `rgba(16, 185, 129, ${0.3 + Math.random() * 0.3})`);
-                    
-                    // Dessiner la barre
-                    ctx.fillStyle = gradient;
-                    ctx.fillRect(x + 1, y, barWidth - 2, barHeight);
-                }
-                
-                // Continuer l'animation
-                requestAnimationFrame(draw);
-            }
-            
-            draw();
         }
         
         // Télécharger l'audio
         function downloadAudio() {
-            showMessage("Téléchargement de l'ambiance sonore...", "info");
+            showMessage("Fonctionnalité de téléchargement audio en développement...", "info");
             
-            // Dans une implémentation réelle, on générerait un fichier audio
-            // Pour cette démo, nous créons un fichier texte avec les instructions
+            // Note : La génération de fichiers audio réels nécessiterait plus de code
+            // Pour cette démo, nous créons un fichier texte avec les paramètres
+            
             const audioContent = `Ambiance sonore générée pour: "${appState.currentPrompt}"
             
-Instructions pour recréer cette ambiance:
-- Fréquence de base: 220Hz
-- Type d'onde: Sinusoïdale
-- Modulation: LFO à 0.5Hz
-- Caractéristique: ${audioInfo.textContent}
+Paramètres audio:
+- Type: ${appState.promptType || 'général'}
+- Fréquences: 220Hz et 440Hz
+- Formes d'onde: Sinus et triangle
+- Volume: 10%
 
-Ceci est une simulation. Dans une version complète, un vrai fichier audio serait généré.`;
+Instructions pour recréer:
+1. Ouvrir un synthétiseur en ligne
+2. Régler deux oscillateurs aux fréquences ci-dessus
+3. Ajuster le filtre lowpass à 1000Hz
+4. Jouer pour entendre une ambiance similaire
+
+Ceci est une simulation. Dans une version complète, un vrai fichier MP3 serait généré.`;
             
             const blob = new Blob([audioContent], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
@@ -1599,6 +1640,9 @@ Ceci est une simulation. Dans une version complète, un vrai fichier audio serai
                         fallbackShare(canvas);
                     }
                 });
+            }).catch(error => {
+                console.error("Erreur de capture:", error);
+                showMessage("Impossible de partager. Essayez le téléchargement.", "error");
             });
         }
         
@@ -1642,7 +1686,7 @@ Date de création: ${new Date().toLocaleString()}
                     // Ajouter les métadonnées
                     const metadata = {
                         prompt: appState.currentPrompt,
-                        colors: appState.currentColors,
+                        colors: appState.currentColors.map(color => rgbToHex(color[0], color[1], color[2])),
                         text: appState.currentText,
                         date: new Date().toISOString()
                     };
@@ -1700,39 +1744,67 @@ Date de création: ${new Date().toLocaleString()}
             generatedText.classList.remove('active');
             generatedText.textContent = '';
             textPlaceholder.style.display = 'flex';
+            
+            // Arrêter le visualiseur
+            if (appState.visualizerInterval) {
+                clearInterval(appState.visualizerInterval);
+                appState.visualizerInterval = null;
+            }
         }
         
         // Mode démo (fallback)
         function useDemoMode(prompt) {
+            // Détecter le type
+            const promptType = detectPromptType(prompt);
+            
             // Utiliser des images de démo
-            const demoImageIndex = Math.floor(Math.random() * fallbackImages.length);
-            appState.currentImageUrl = fallbackImages[demoImageIndex];
+            const images = imageDatabase[promptType] || imageDatabase.default;
+            const demoImage = images[Math.floor(Math.random() * images.length)];
+            appState.currentImageUrl = demoImage;
             
             // Afficher l'image
             imagePlaceholder.style.display = 'none';
-            generatedImage.src = appState.currentImageUrl;
+            generatedImage.src = demoImage;
             generatedImage.classList.add('active');
             
-            // Générer un texte
-            const demoTextIndex = Math.floor(Math.random() * poeticPhrases.default.length);
-            appState.currentText = poeticPhrases.default[demoTextIndex];
+            // Générer un texte adapté
+            const phrases = poeticPhrases[promptType] || poeticPhrases.default;
+            const demoText = phrases[Math.floor(Math.random() * phrases.length)];
+            appState.currentText = demoText;
             
             textPlaceholder.style.display = 'none';
-            generatedText.textContent = appState.currentText;
+            generatedText.textContent = demoText;
             generatedText.classList.add('active');
             
             // Générer un son
-            createSyntheticSound('default');
+            createWorkingAudio(promptType);
             
             // Extraire des couleurs de démo
-            const demoColors = [
-                [124, 58, 237], // Violet
-                [16, 185, 129], // Vert
-                [245, 158, 11], // Orange
-                [59, 130, 246], // Bleu
-                [239, 68, 68]   // Rouge
-            ];
+            const demoPalettes = {
+                'chat': [
+                    [255, 223, 186], // Peach
+                    [255, 179, 186], // Light pink
+                    [186, 225, 255], // Light blue
+                    [255, 255, 186], // Light yellow
+                    [186, 255, 201]  // Mint
+                ],
+                'robot': [
+                    [128, 128, 128], // Gray
+                    [178, 34, 34],   // Red
+                    [105, 105, 105], // Dim gray
+                    [169, 169, 169], // Dark gray
+                    [220, 220, 220]  // Gainsboro
+                ],
+                'default': [
+                    [124, 58, 237],  // Violet
+                    [16, 185, 129],  // Vert
+                    [245, 158, 11],  // Orange
+                    [59, 130, 246],  // Bleu
+                    [239, 68, 68]    // Rouge
+                ]
+            };
             
+            const demoColors = demoPalettes[promptType] || demoPalettes.default;
             appState.currentColors = demoColors;
             displayColorPalette(demoColors);
         }
@@ -1747,14 +1819,6 @@ Date de création: ${new Date().toLocaleString()}
                 message.classList.remove('active');
             }, 5000);
         }
-        
-        // Gestion du redimensionnement de la fenêtre
-        window.addEventListener('resize', function() {
-            // Recalculer le visualiseur audio si nécessaire
-            if (audioVisualizer) {
-                updateAudioVisualizer();
-            }
-        });
     </script>
 </body>
 </html>
