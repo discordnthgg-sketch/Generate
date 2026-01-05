@@ -1,0 +1,1760 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Univers à Mots - Générateur d'Univers Immersifs</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500;600&family=Crimson+Pro:wght@400;600&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Librairies JS -->
+    <script src="https://cdn.jsdelivr.net/npm/colorthief@2.3.2/dist/color-thief.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <style>
+        /* Reset et variables */
+        :root {
+            --bg-primary: #0f0f1a;
+            --bg-secondary: #1a1a2e;
+            --text-primary: #e8e8f0;
+            --text-secondary: #b8b8d1;
+            --accent-primary: #7c3aed;
+            --accent-secondary: #10b981;
+            --accent-tertiary: #f59e0b;
+            --card-bg: rgba(25, 25, 40, 0.8);
+            --border-color: rgba(124, 58, 237, 0.3);
+            --shadow-color: rgba(0, 0, 0, 0.5);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --radius: 12px;
+            --transition: all 0.3s ease;
+        }
+        
+        [data-theme="light"] {
+            --bg-primary: #f8f9fa;
+            --bg-secondary: #e9ecef;
+            --text-primary: #212529;
+            --text-secondary: #495057;
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --border-color: rgba(124, 58, 237, 0.2);
+            --shadow-color: rgba(0, 0, 0, 0.1);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+            transition: var(--transition);
+        }
+        
+        /* Particules de fond */
+        #particles-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+        
+        /* Container principal */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        /* Header */
+        header {
+            padding: 20px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .logo-icon {
+            font-size: 2rem;
+            color: var(--accent-primary);
+            filter: drop-shadow(0 0 8px rgba(124, 58, 237, 0.5));
+        }
+        
+        .logo-text {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, #7c3aed, #10b981);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .theme-toggle {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.2rem;
+            color: var(--accent-primary);
+            transition: var(--transition);
+        }
+        
+        .theme-toggle:hover {
+            transform: rotate(20deg);
+            box-shadow: 0 0 12px var(--accent-primary);
+        }
+        
+        /* Hero section */
+        .hero {
+            text-align: center;
+            padding: 60px 0 40px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .hero h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+        
+        .hero p {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            margin-bottom: 40px;
+        }
+        
+        /* Zone de saisie */
+        .generator {
+            padding: 30px 0;
+        }
+        
+        .prompt-container {
+            max-width: 800px;
+            margin: 0 auto 40px;
+        }
+        
+        .prompt-input {
+            width: 100%;
+            min-height: 120px;
+            padding: 20px;
+            background: var(--card-bg);
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius);
+            font-family: 'Inter', sans-serif;
+            font-size: 1.1rem;
+            color: var(--text-primary);
+            resize: vertical;
+            transition: var(--transition);
+            backdrop-filter: blur(10px);
+        }
+        
+        .prompt-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 20px rgba(124, 58, 237, 0.3);
+        }
+        
+        .prompt-input::placeholder {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+        
+        .examples {
+            margin-top: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        .example-tag {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .example-tag:hover {
+            background: var(--accent-primary);
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .generate-btn {
+            display: block;
+            margin: 30px auto;
+            padding: 16px 40px;
+            background: linear-gradient(90deg, #7c3aed, #10b981);
+            border: none;
+            border-radius: 50px;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .generate-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(124, 58, 237, 0.6);
+        }
+        
+        .generate-btn:active {
+            transform: translateY(-1px);
+        }
+        
+        .generate-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-icon {
+            margin-right: 10px;
+        }
+        
+        /* Loader */
+        .loader {
+            display: none;
+            text-align: center;
+            margin: 40px 0;
+        }
+        
+        .loader.active {
+            display: block;
+        }
+        
+        .alchemy-loader {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            position: relative;
+        }
+        
+        .alchemy-loader:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 4px solid transparent;
+            border-top-color: var(--accent-primary);
+            border-bottom-color: var(--accent-secondary);
+            animation: spin 1.5s linear infinite;
+        }
+        
+        .alchemy-loader:after {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 4px solid transparent;
+            border-left-color: var(--accent-tertiary);
+            border-right-color: var(--accent-tertiary);
+            animation: spinReverse 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes spinReverse {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(-360deg); }
+        }
+        
+        /* Résultats */
+        .results {
+            display: none;
+            padding: 40px 0 80px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+        }
+        
+        .results.active {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .results-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+        }
+        
+        @media (min-width: 992px) {
+            .results-grid {
+                grid-template-columns: 3fr 2fr;
+            }
+        }
+        
+        .result-card {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 30px var(--shadow-color);
+            backdrop-filter: blur(10px);
+            transition: var(--transition);
+        }
+        
+        .result-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px var(--shadow-color);
+        }
+        
+        .card-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Playfair Display', serif;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: var(--accent-primary);
+        }
+        
+        .card-title i {
+            font-size: 1.3rem;
+        }
+        
+        /* Image générée */
+        .image-container {
+            position: relative;
+            border-radius: var(--radius);
+            overflow: hidden;
+            min-height: 300px;
+            background: var(--bg-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .generated-image {
+            max-width: 100%;
+            max-height: 500px;
+            border-radius: var(--radius);
+            display: none;
+        }
+        
+        .generated-image.active {
+            display: block;
+            animation: fadeIn 0.8s ease;
+        }
+        
+        .placeholder-image {
+            width: 100%;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .placeholder-image i {
+            font-size: 4rem;
+            opacity: 0.5;
+        }
+        
+        /* Palette de couleurs */
+        .color-palette {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .color-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .color-swatch {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        
+        .color-swatch:hover {
+            transform: scale(1.1);
+        }
+        
+        .color-hex {
+            font-family: monospace;
+            font-size: 0.9rem;
+            background: var(--bg-secondary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .color-hex:hover {
+            background: var(--accent-primary);
+            color: white;
+        }
+        
+        /* Carte son */
+        .audio-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .audio-visualizer {
+            width: 100%;
+            height: 100px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .audio-visualizer canvas {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .audio-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .audio-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+        
+        .audio-btn:hover {
+            background: var(--accent-secondary);
+            transform: scale(1.05);
+        }
+        
+        .audio-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .audio-info {
+            flex: 1;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        
+        .audio-download {
+            padding: 10px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: var(--transition);
+        }
+        
+        .audio-download:hover {
+            background: var(--accent-primary);
+            color: white;
+        }
+        
+        /* Carte texte */
+        .text-container {
+            position: relative;
+            padding: 20px;
+            font-family: 'Crimson Pro', serif;
+            font-size: 1.2rem;
+            line-height: 1.8;
+            background: linear-gradient(to bottom, #f9f3e9, #f5eedf);
+            color: #3a2c1a;
+            border-radius: var(--radius);
+            border: 1px solid #d4b483;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.05);
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .text-container:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(to right, #7c3aed, #10b981);
+            border-radius: var(--radius) var(--radius) 0 0;
+        }
+        
+        .generated-text {
+            opacity: 0;
+            transition: opacity 0.8s ease;
+        }
+        
+        .generated-text.active {
+            opacity: 1;
+        }
+        
+        .text-placeholder {
+            color: #8a7a6a;
+            font-style: italic;
+            text-align: center;
+            padding: 40px 20px;
+        }
+        
+        /* Actions */
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 40px;
+        }
+        
+        .action-btn {
+            padding: 14px 28px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            color: var(--text-primary);
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .action-btn:hover {
+            background: var(--accent-primary);
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        /* Footer */
+        footer {
+            padding: 40px 0;
+            text-align: center;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+        
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 20px 0;
+        }
+        
+        .footer-link {
+            color: var(--accent-primary);
+            text-decoration: none;
+            transition: var(--transition);
+        }
+        
+        .footer-link:hover {
+            color: var(--accent-secondary);
+        }
+        
+        /* Messages */
+        .message {
+            padding: 15px;
+            border-radius: var(--radius);
+            margin: 20px 0;
+            display: none;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .message.active {
+            display: flex;
+        }
+        
+        .message.success {
+            background: rgba(16, 185, 129, 0.15);
+            border-left: 4px solid var(--success);
+            color: var(--success);
+        }
+        
+        .message.warning {
+            background: rgba(245, 158, 11, 0.15);
+            border-left: 4px solid var(--warning);
+            color: var(--warning);
+        }
+        
+        .message.error {
+            background: rgba(239, 68, 68, 0.15);
+            border-left: 4px solid var(--error);
+            color: var(--error);
+        }
+        
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            
+            .color-palette {
+                justify-content: center;
+            }
+            
+            .audio-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .actions {
+                flex-direction: column;
+            }
+            
+            .action-btn {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Canvas pour les particules de fond -->
+    <canvas id="particles-canvas"></canvas>
+    
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="logo">
+                <i class="fas fa-sparkles logo-icon"></i>
+                <h1 class="logo-text">Univers à Mots</h1>
+            </div>
+            <button class="theme-toggle" id="themeToggle" aria-label="Changer de thème">
+                <i class="fas fa-moon"></i>
+            </button>
+        </header>
+        
+        <!-- Hero Section -->
+        <section class="hero">
+            <h1>Donnez vie à vos mots</h1>
+            <p>Décrivez un univers en quelques mots et recevez son essence sous forme d'image, de son, de texte et de couleurs.</p>
+        </section>
+        
+        <!-- Zone de génération -->
+        <section class="generator">
+            <div class="prompt-container">
+                <textarea class="prompt-input" id="promptInput" placeholder="Exemple: Une librairie abandonnée sur une planète étrangère, aquarelle mélancolique..."></textarea>
+                
+                <div class="examples">
+                    <div class="example-tag" data-prompt="Un vieux robot jardinant sur Mars, atelier d'illustration">Robot jardinier martien</div>
+                    <div class="example-tag" data-prompt="Une librairie flottante dans les nuages, estampe japonaise">Librairie flottante</div>
+                    <div class="example-tag" data-prompt="Une fête foraine sous l'océan, neon noir années 80">Fête foraine sous-marine</div>
+                    <div class="example-tag" data-prompt="Un samouraï dans une station spatiale abandonnée, croquis au crayon">Samouraï spatial</div>
+                </div>
+            </div>
+            
+            <button class="generate-btn" id="generateBtn">
+                <i class="fas fa-magic btn-icon"></i> Créer l'univers
+            </button>
+            
+            <!-- Loader -->
+            <div class="loader" id="loader">
+                <div class="alchemy-loader"></div>
+                <p>Création de votre univers en cours... Cette opération peut prendre quelques secondes.</p>
+            </div>
+            
+            <!-- Messages -->
+            <div class="message" id="message"></div>
+        </section>
+        
+        <!-- Résultats -->
+        <section class="results" id="resultsSection">
+            <div class="results-grid">
+                <!-- Colonne gauche : Image et couleurs -->
+                <div>
+                    <!-- Image générée -->
+                    <div class="result-card">
+                        <h3 class="card-title">
+                            <i class="fas fa-image"></i> L'Univers Visuel
+                        </h3>
+                        <div class="image-container">
+                            <div class="placeholder-image" id="imagePlaceholder">
+                                <i class="fas fa-mountain-sun"></i>
+                                <p>Votre image apparaîtra ici</p>
+                            </div>
+                            <img class="generated-image" id="generatedImage" alt="Univers généré">
+                        </div>
+                    </div>
+                    
+                    <!-- Palette de couleurs -->
+                    <div class="result-card">
+                        <h3 class="card-title">
+                            <i class="fas fa-palette"></i> Palette de Couleurs
+                        </h3>
+                        <div class="color-palette" id="colorPalette">
+                            <div class="placeholder-image">
+                                <i class="fas fa-fill-drip"></i>
+                                <p>Les couleurs extraites de l'image apparaîtront ici</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Colonne droite : Son et texte -->
+                <div>
+                    <!-- Ambiance sonore -->
+                    <div class="result-card">
+                        <h3 class="card-title">
+                            <i class="fas fa-music"></i> Ambiance Sonore
+                        </h3>
+                        <div class="audio-container">
+                            <div class="audio-visualizer">
+                                <canvas id="audioVisualizer"></canvas>
+                            </div>
+                            <div class="audio-controls">
+                                <button class="audio-btn" id="playBtn">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <button class="audio-btn" id="stopBtn" disabled>
+                                    <i class="fas fa-stop"></i>
+                                </button>
+                                <div class="audio-info" id="audioInfo">
+                                    Ambiance générée à partir de votre description
+                                </div>
+                                <a class="audio-download" id="audioDownload" download="ambiance-univers.mp3">
+                                    <i class="fas fa-download"></i> Télécharger
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Texte poétique -->
+                    <div class="result-card">
+                        <h3 class="card-title">
+                            <i class="fas fa-feather-alt"></i> Évocation Poétique
+                        </h3>
+                        <div class="text-container">
+                            <div class="text-placeholder" id="textPlaceholder">
+                                <i class="fas fa-book-open"></i>
+                                <p>La description poétique de votre univers apparaîtra ici</p>
+                            </div>
+                            <div class="generated-text" id="generatedText"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Actions -->
+            <div class="actions">
+                <button class="action-btn" id="shareBtn">
+                    <i class="fas fa-share-alt"></i> Partager cet univers
+                </button>
+                <button class="action-btn" id="downloadAllBtn">
+                    <i class="fas fa-file-archive"></i> Tout télécharger (ZIP)
+                </button>
+                <button class="action-btn" id="regenerateBtn">
+                    <i class="fas fa-redo"></i> Recréer un autre univers
+                </button>
+            </div>
+        </section>
+        
+        <!-- Footer -->
+        <footer>
+            <p>Univers à Mots - Générateur d'Univers Immersifs</p>
+            <div class="footer-links">
+                <a href="#" class="footer-link" id="githubLink">
+                    <i class="fab fa-github"></i> Code Source
+                </a>
+                <a href="#" class="footer-link" id="aboutLink">
+                    <i class="fas fa-info-circle"></i> À propos
+                </a>
+            </div>
+            <p>© 2023 - Créé avec <i class="fas fa-heart" style="color: #ef4444;"></i> sans backend ni API keys</p>
+        </footer>
+    </div>
+
+    <script>
+        // État de l'application
+        const appState = {
+            currentTheme: 'dark',
+            isGenerating: false,
+            currentAudio: null,
+            isPlaying: false,
+            audioContext: null,
+            audioBuffer: null,
+            currentColors: [],
+            currentImageUrl: '',
+            currentText: '',
+            currentPrompt: ''
+        };
+        
+        // Éléments DOM
+        const themeToggle = document.getElementById('themeToggle');
+        const promptInput = document.getElementById('promptInput');
+        const generateBtn = document.getElementById('generateBtn');
+        const loader = document.getElementById('loader');
+        const message = document.getElementById('message');
+        const resultsSection = document.getElementById('resultsSection');
+        const generatedImage = document.getElementById('generatedImage');
+        const imagePlaceholder = document.getElementById('imagePlaceholder');
+        const colorPalette = document.getElementById('colorPalette');
+        const audioVisualizer = document.getElementById('audioVisualizer');
+        const playBtn = document.getElementById('playBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const audioInfo = document.getElementById('audioInfo');
+        const audioDownload = document.getElementById('audioDownload');
+        const generatedText = document.getElementById('generatedText');
+        const textPlaceholder = document.getElementById('textPlaceholder');
+        const shareBtn = document.getElementById('shareBtn');
+        const downloadAllBtn = document.getElementById('downloadAllBtn');
+        const regenerateBtn = document.getElementById('regenerateBtn');
+        const exampleTags = document.querySelectorAll('.example-tag');
+        const githubLink = document.getElementById('githubLink');
+        const aboutLink = document.getElementById('aboutLink');
+        
+        // Phrases poétiques pré-définies pour différents thèmes
+        const poeticPhrases = {
+            // Thèmes généraux
+            spatial: [
+                "Dans le silence infini du cosmos, les étoiles racontent des histoires oubliées. Chaque étincelle est un souvenir, chaque constellation un poème gravé dans la nuit éternelle.",
+                "L'espace n'est pas un vide, mais un océan de possibilités. Les planètes dansent une valse silencieuse, orchestrée par la gravité, musique des sphères que seuls les rêveurs peuvent entendre.",
+                "Au-delà des nuages de poussière interstellaire, des mondes naissent et meurent dans un spectacle cosmique. Nous ne sommes que des passagers éphémères sur ce vaisseau qu'est la Terre."
+            ],
+            nature: [
+                "La forêt respire lentement, chaque feuille un poumon vert. Les racines profondes murmurent les secrets de la terre, tandis que la canopée chuchote avec le vent.",
+                "Le ruisseau serpente à travers la mousse comme une pensée fugace. L'eau caresse les pierres polies par le temps, sculptant des mémoires liquides dans le lit de la terre.",
+                "Les montagnes, gardiennes silencieuses du temps, portent les cicatrices des siècles sur leurs flancs de pierre. Leurs sommets touchent le ciel, ponts entre la terre et l'infini."
+            ],
+            urbain: [
+                "La ville bat au rythme de mille cœurs, lumière liquide coulant dans les artères de béton. Chaque fenêtre éclairée est une histoire qui s'écrit dans la nuit.",
+                "Les rues sont des veines, les bâtiments des organes, et les habitants le sang qui fait vivre cette créature de verre et d'acier. La ville respire, dort, rêve et se réveille sans cesse.",
+                "Sous les néons qui pleurent leur lumière colorée, la ville dévoile son âme nocturne. Les ombres dansent sur le trottoir, compagnons silencieux des promeneurs solitaires."
+            ],
+            fantastique: [
+                "Les créatures des légendes se cachent dans les interstices de la réalité, attendant le crépuscule pour danser entre les mondes. La magie est le souffle de l'imagination donnant vie à l'impossible.",
+                "Les portes entre les dimensions sont faites de rêves et de souvenirs. Il suffit de croire assez fort pour les voir s'ouvrir, révélant des paysages tissés de mystère et d'émerveillement.",
+                "Dans les royaumes oubliés, le temps s'écoule comme du miel épais. Les châteaux flottent sur des nuages de possibilités, et les rivières chantent des mélodies venues d'ailleurs."
+            ],
+            // Phrases par défaut
+            default: [
+                "L'univers que vous avez imaginé prend forme, mélangeant réalité et songe. Chaque détail est une note dans la symphonie de votre création, chaque couleur un mot dans le poème du visible.",
+                "Entre le réel et l'imaginaire, votre vision s'incarne. Les frontières s'estompent, laissant place à un monde où tout est possible, où chaque élément raconte une partie de l'histoire.",
+                "Votre imagination a tissé cette réalité alternative, où les règles de notre monde se plient aux possibilités infinies de la créativité. Ici, tout est à la fois familier et merveilleusement étrange."
+            ]
+        };
+        
+        // Sons pré-enregistrés (seront générés à la volée)
+        const soundPresets = {
+            spatial: ['synth_pad', 'atmospheric_drone', 'cosmic_winds'],
+            nature: ['forest_ambience', 'gentle_stream', 'bird_songs'],
+            urbain: ['city_traffic', 'rain_on_window', 'distant_murmur'],
+            fantastique: ['magical_chimes', 'enchanted_forest', 'mystical_echoes'],
+            default: ['ambient_pad', 'soft_waves', 'etheral_tones']
+        };
+        
+        // Images de secours pour démo
+        const fallbackImages = [
+            'https://images.unsplash.com/photo-1446776653964-20c1d3a81b06?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+            'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w-800&q=80',
+            'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+            'https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
+        ];
+        
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', function() {
+            initParticles();
+            initEventListeners();
+            setTheme(appState.currentTheme);
+            
+            // Lien GitHub
+            githubLink.href = "https://github.com";
+            githubLink.target = "_blank";
+            
+            // Lien À propos
+            aboutLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                showMessage("Univers à Mots est un générateur d'univers immersifs fonctionnant entièrement dans votre navigateur, sans clé API ni backend. Créé avec HTML, CSS et JavaScript pur.", "info");
+            });
+            
+            // Démo au chargement
+            setTimeout(() => {
+                showMessage("Prêt à créer ! Essayez avec l'un des exemples ou tapez votre propre description.", "success");
+            }, 1000);
+        });
+        
+        // Initialisation des écouteurs d'événements
+        function initEventListeners() {
+            // Thème
+            themeToggle.addEventListener('click', toggleTheme);
+            
+            // Bouton de génération
+            generateBtn.addEventListener('click', generateUniverse);
+            
+            // Exemples
+            exampleTags.forEach(tag => {
+                tag.addEventListener('click', function() {
+                    promptInput.value = this.getAttribute('data-prompt');
+                    promptInput.focus();
+                });
+            });
+            
+            // Contrôles audio
+            playBtn.addEventListener('click', toggleAudio);
+            stopBtn.addEventListener('click', stopAudio);
+            
+            // Actions
+            shareBtn.addEventListener('click', shareUniverse);
+            downloadAllBtn.addEventListener('click', downloadAll);
+            regenerateBtn.addEventListener('click', regenerateUniverse);
+            
+            // Entrée dans le textarea
+            promptInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    generateUniverse();
+                }
+            });
+        }
+        
+        // Gestion du thème
+        function toggleTheme() {
+            const newTheme = appState.currentTheme === 'dark' ? 'light' : 'dark';
+            setTheme(newTheme);
+        }
+        
+        function setTheme(theme) {
+            appState.currentTheme = theme;
+            document.documentElement.setAttribute('data-theme', theme);
+            
+            const icon = themeToggle.querySelector('i');
+            icon.className = theme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+            
+            // Sauvegarder la préférence
+            localStorage.setItem('univers-a-mots-theme', theme);
+        }
+        
+        // Particules de fond
+        function initParticles() {
+            const canvas = document.getElementById('particles-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            const particles = [];
+            const particleCount = 50;
+            
+            // Créer les particules
+            for (let i = 0; i < particleCount; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 3 + 1,
+                    speedX: Math.random() * 0.5 - 0.25,
+                    speedY: Math.random() * 0.5 - 0.25,
+                    color: `rgba(${Math.floor(Math.random() * 100 + 155)}, ${Math.floor(Math.random() * 100 + 100)}, ${Math.floor(Math.random() * 155 + 100)}, ${Math.random() * 0.3 + 0.1})`
+                });
+            }
+            
+            // Animation des particules
+            function animateParticles() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Mettre à jour et dessiner chaque particule
+                particles.forEach(p => {
+                    p.x += p.speedX;
+                    p.y += p.speedY;
+                    
+                    // Rebond sur les bords
+                    if (p.x < 0 || p.x > canvas.width) p.speedX *= -1;
+                    if (p.y < 0 || p.y > canvas.height) p.speedY *= -1;
+                    
+                    // Dessiner la particule
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.fill();
+                    
+                    // Dessiner des lignes entre particules proches
+                    particles.forEach(p2 => {
+                        const dx = p.x - p2.x;
+                        const dy = p.y - p2.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distance < 100) {
+                            ctx.beginPath();
+                            ctx.strokeStyle = `rgba(124, 58, 237, ${0.1 * (1 - distance/100)})`;
+                            ctx.lineWidth = 0.5;
+                            ctx.moveTo(p.x, p.y);
+                            ctx.lineTo(p2.x, p2.y);
+                            ctx.stroke();
+                        }
+                    });
+                });
+                
+                requestAnimationFrame(animateParticles);
+            }
+            
+            animateParticles();
+        }
+        
+        // Génération de l'univers
+        async function generateUniverse() {
+            const prompt = promptInput.value.trim();
+            
+            if (!prompt) {
+                showMessage("Veuillez décrire un univers avant de créer.", "warning");
+                promptInput.focus();
+                return;
+            }
+            
+            if (appState.isGenerating) {
+                showMessage("Génération déjà en cours. Veuillez patienter.", "warning");
+                return;
+            }
+            
+            appState.isGenerating = true;
+            appState.currentPrompt = prompt;
+            
+            // Réinitialiser l'état
+            stopAudio();
+            resetResults();
+            
+            // Afficher le loader et cacher les résultats
+            loader.classList.add('active');
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin btn-icon"></i> Création en cours...';
+            
+            showMessage("Création de votre univers...", "info");
+            
+            try {
+                // Générer les éléments en parallèle (simulation)
+                await Promise.all([
+                    generateImage(prompt),
+                    generateAudio(prompt),
+                    generateText(prompt)
+                ]);
+                
+                // Afficher les résultats
+                setTimeout(() => {
+                    loader.classList.remove('active');
+                    resultsSection.classList.add('active');
+                    generateBtn.disabled = false;
+                    generateBtn.innerHTML = '<i class="fas fa-magic btn-icon"></i> Créer l\'univers';
+                    appState.isGenerating = false;
+                    
+                    showMessage("Votre univers a été créé avec succès !", "success");
+                    
+                    // Extraire les couleurs de l'image
+                    extractColors();
+                }, 1500);
+                
+            } catch (error) {
+                console.error("Erreur lors de la génération:", error);
+                showMessage("Une erreur est survenue. Utilisation du mode démo.", "error");
+                
+                // Mode démo avec contenu pré-défini
+                useDemoMode(prompt);
+                
+                loader.classList.remove('active');
+                resultsSection.classList.add('active');
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = '<i class="fas fa-magic btn-icon"></i> Créer l\'univers';
+                appState.isGenerating = false;
+            }
+        }
+        
+        // Générer une image
+        async function generateImage(prompt) {
+            showMessage("Génération de l'image...", "info");
+            
+            // Simuler un délai de génération
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Dans une vraie implémentation, on utiliserait une API sans clé comme Craiyon
+            // Ici, nous simulons avec une image Unsplash aléatoire basée sur le prompt
+            
+            // Déterminer une catégorie basée sur le prompt
+            let category = 'nature';
+            const promptLower = prompt.toLowerCase();
+            
+            if (promptLower.includes('espace') || promptLower.includes('planète') || promptLower.includes('cosmos') || promptLower.includes('martien')) {
+                category = 'spatial';
+            } else if (promptLower.includes('ville') || promptLower.includes('urbain') || promptLower.includes('métropole') || promptLower.includes('rue')) {
+                category = 'urbain';
+            } else if (promptLower.includes('fantastique') || promptLower.includes('magie') || promptLower.includes('enchante') || promptLower.includes('mythique')) {
+                category = 'fantastique';
+            }
+            
+            // Utiliser une image de démo appropriée
+            const demoImages = {
+                spatial: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                nature: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                urbain: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                fantastique: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
+            };
+            
+            const imageUrl = demoImages[category] || demoImages.nature;
+            appState.currentImageUrl = imageUrl;
+            
+            // Afficher l'image
+            imagePlaceholder.style.display = 'none';
+            generatedImage.src = imageUrl;
+            generatedImage.classList.add('active');
+            
+            return imageUrl;
+        }
+        
+        // Générer une ambiance audio
+        async function generateAudio(prompt) {
+            showMessage("Création de l'ambiance sonore...", "info");
+            
+            // Simuler un délai de génération
+            await new Promise(resolve => setTimeout(resolve, 800));
+            
+            // Déterminer le type d'ambiance basé sur le prompt
+            let soundType = 'default';
+            const promptLower = prompt.toLowerCase();
+            
+            if (promptLower.includes('pluie') || promptLower.includes('orage')) {
+                soundType = 'nature';
+                audioInfo.textContent = "Ambiance pluvieuse et orageuse";
+            } else if (promptLower.includes('forêt') || promptLower.includes('nature')) {
+                soundType = 'nature';
+                audioInfo.textContent = "Ambiance de forêt avec oiseaux et feuilles";
+            } else if (promptLower.includes('ville') || promptLower.includes('métropole')) {
+                soundType = 'urbain';
+                audioInfo.textContent = "Bruits de ville et murmures urbains";
+            } else if (promptLower.includes('espace') || promptLower.includes('cosmos')) {
+                soundType = 'spatial';
+                audioInfo.textContent = "Sons synthétiques et pads atmosphériques";
+            } else {
+                audioInfo.textContent = "Ambiance générée à partir de votre description";
+            }
+            
+            // Initialiser l'audio si nécessaire
+            if (!appState.audioContext) {
+                appState.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            // Créer un son synthétique basé sur le type
+            createSyntheticSound(soundType);
+            
+            // Activer le bouton de téléchargement
+            audioDownload.href = "#";
+            audioDownload.onclick = function(e) {
+                e.preventDefault();
+                downloadAudio();
+            };
+        }
+        
+        // Créer un son synthétique
+        function createSyntheticSound(type) {
+            const audioContext = appState.audioContext;
+            
+            // Arrêter tout son existant
+            if (appState.currentAudio) {
+                appState.currentAudio.stop();
+            }
+            
+            // Créer un nouveau son
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            // Configurer selon le type
+            let frequency = 220;
+            let waveType = 'sine';
+            
+            switch(type) {
+                case 'spatial':
+                    frequency = 110;
+                    waveType = 'sine';
+                    break;
+                case 'nature':
+                    frequency = 440;
+                    waveType = 'triangle';
+                    break;
+                case 'urbain':
+                    frequency = 330;
+                    waveType = 'square';
+                    break;
+                case 'fantastique':
+                    frequency = 550;
+                    waveType = 'sawtooth';
+                    break;
+                default:
+                    frequency = 220;
+                    waveType = 'sine';
+            }
+            
+            oscillator.type = waveType;
+            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+            
+            // Modulation pour un son plus intéressant
+            const lfo = audioContext.createOscillator();
+            lfo.frequency.setValueAtTime(0.5, audioContext.currentTime);
+            
+            const lfoGain = audioContext.createGain();
+            lfoGain.gain.setValueAtTime(10, audioContext.currentTime);
+            
+            lfo.connect(lfoGain);
+            lfoGain.connect(oscillator.frequency);
+            
+            // Enveloppe de gain
+            gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.5);
+            
+            // Connexions
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            // Démarrer les oscillateurs
+            oscillator.start();
+            lfo.start();
+            
+            // Stocker pour contrôle ultérieur
+            appState.currentAudio = {
+                oscillator: oscillator,
+                gain: gainNode,
+                lfo: lfo,
+                lfoGain: lfoGain
+            };
+            
+            // Mettre à jour l'état
+            appState.isPlaying = false;
+            playBtn.disabled = false;
+            stopBtn.disabled = true;
+            
+            // Mettre à jour l'interface
+            updateAudioVisualizer();
+        }
+        
+        // Générer un texte poétique
+        async function generateText(prompt) {
+            showMessage("Écriture de l'évocation poétique...", "info");
+            
+            // Simuler un délai de génération
+            await new Promise(resolve => setTimeout(resolve, 600));
+            
+            // Déterminer la catégorie
+            let category = 'default';
+            const promptLower = prompt.toLowerCase();
+            
+            if (promptLower.includes('espace') || promptLower.includes('planète') || promptLower.includes('cosmos') || promptLower.includes('martien')) {
+                category = 'spatial';
+            } else if (promptLower.includes('forêt') || promptLower.includes('nature') || promptLower.includes('jardin')) {
+                category = 'nature';
+            } else if (promptLower.includes('ville') || promptLower.includes('urbain') || promptLower.includes('rue')) {
+                category = 'urbain';
+            } else if (promptLower.includes('fantastique') || promptLower.includes('magie') || promptLower.includes('enchante') || promptLower.includes('mythique')) {
+                category = 'fantastique';
+            }
+            
+            // Sélectionner une phrase aléatoire de la catégorie
+            const phrases = poeticPhrases[category] || poeticPhrases.default;
+            const randomText = phrases[Math.floor(Math.random() * phrases.length)];
+            
+            appState.currentText = randomText;
+            
+            // Afficher le texte
+            textPlaceholder.style.display = 'none';
+            generatedText.textContent = randomText;
+            generatedText.classList.add('active');
+            
+            return randomText;
+        }
+        
+        // Extraire les couleurs de l'image
+        function extractColors() {
+            if (!appState.currentImageUrl) return;
+            
+            const colorThief = new ColorThief();
+            const img = new Image();
+            img.crossOrigin = "Anonymous";
+            img.src = appState.currentImageUrl;
+            
+            img.onload = function() {
+                try {
+                    const palette = colorThief.getPalette(img, 5);
+                    appState.currentColors = palette;
+                    
+                    // Afficher la palette
+                    colorPalette.innerHTML = '';
+                    
+                    palette.forEach(color => {
+                        const hex = rgbToHex(color[0], color[1], color[2]);
+                        
+                        const colorItem = document.createElement('div');
+                        colorItem.className = 'color-item';
+                        
+                        const swatch = document.createElement('div');
+                        swatch.className = 'color-swatch';
+                        swatch.style.backgroundColor = hex;
+                        swatch.title = hex;
+                        
+                        const hexCode = document.createElement('div');
+                        hexCode.className = 'color-hex';
+                        hexCode.textContent = hex;
+                        hexCode.title = "Cliquer pour copier";
+                        
+                        // Copier au clic
+                        hexCode.addEventListener('click', function() {
+                            navigator.clipboard.writeText(hex).then(() => {
+                                showMessage(`Couleur ${hex} copiée !`, "success");
+                            });
+                        });
+                        
+                        colorItem.appendChild(swatch);
+                        colorItem.appendChild(hexCode);
+                        colorPalette.appendChild(colorItem);
+                    });
+                } catch (error) {
+                    console.error("Erreur lors de l'extraction des couleurs:", error);
+                    
+                    // Palette par défaut
+                    const defaultColors = [
+                        [124, 58, 237], // Violet
+                        [16, 185, 129], // Vert
+                        [245, 158, 11], // Orange
+                        [59, 130, 246], // Bleu
+                        [239, 68, 68]   // Rouge
+                    ];
+                    
+                    appState.currentColors = defaultColors;
+                    displayColorPalette(defaultColors);
+                }
+            };
+        }
+        
+        // Afficher une palette de couleurs
+        function displayColorPalette(colors) {
+            colorPalette.innerHTML = '';
+            
+            colors.forEach(color => {
+                const hex = rgbToHex(color[0], color[1], color[2]);
+                
+                const colorItem = document.createElement('div');
+                colorItem.className = 'color-item';
+                
+                const swatch = document.createElement('div');
+                swatch.className = 'color-swatch';
+                swatch.style.backgroundColor = hex;
+                swatch.title = hex;
+                
+                const hexCode = document.createElement('div');
+                hexCode.className = 'color-hex';
+                hexCode.textContent = hex;
+                hexCode.title = "Cliquer pour copier";
+                
+                hexCode.addEventListener('click', function() {
+                    navigator.clipboard.writeText(hex).then(() => {
+                        showMessage(`Couleur ${hex} copiée !`, "success");
+                    });
+                });
+                
+                colorItem.appendChild(swatch);
+                colorItem.appendChild(hexCode);
+                colorPalette.appendChild(colorItem);
+            });
+        }
+        
+        // Convertir RGB en HEX
+        function rgbToHex(r, g, b) {
+            return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
+        }
+        
+        // Contrôles audio
+        function toggleAudio() {
+            if (!appState.audioContext || !appState.currentAudio) return;
+            
+            if (appState.isPlaying) {
+                // Pause
+                appState.audioContext.suspend();
+                playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                stopBtn.disabled = false;
+                appState.isPlaying = false;
+            } else {
+                // Play
+                appState.audioContext.resume();
+                playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                stopBtn.disabled = false;
+                appState.isPlaying = true;
+            }
+        }
+        
+        function stopAudio() {
+            if (!appState.currentAudio) return;
+            
+            // Arrêter le son
+            appState.currentAudio.oscillator.stop();
+            appState.currentAudio.lfo.stop();
+            
+            // Réinitialiser
+            appState.currentAudio = null;
+            appState.isPlaying = false;
+            
+            // Mettre à jour l'interface
+            playBtn.innerHTML = '<i class="fas fa-play"></i>';
+            playBtn.disabled = false;
+            stopBtn.disabled = true;
+            
+            // Recréer le son si on veut le rejouer
+            if (appState.currentPrompt) {
+                const promptLower = appState.currentPrompt.toLowerCase();
+                let soundType = 'default';
+                
+                if (promptLower.includes('pluie') || promptLower.includes('orage')) {
+                    soundType = 'nature';
+                } else if (promptLower.includes('forêt') || promptLower.includes('nature')) {
+                    soundType = 'nature';
+                } else if (promptLower.includes('ville') || promptLower.includes('métropole')) {
+                    soundType = 'urbain';
+                } else if (promptLower.includes('espace') || promptLower.includes('cosmos')) {
+                    soundType = 'spatial';
+                }
+                
+                createSyntheticSound(soundType);
+            }
+        }
+        
+        // Mettre à jour le visualiseur audio
+        function updateAudioVisualizer() {
+            const canvas = audioVisualizer;
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            function draw() {
+                // Effacer le canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Dessiner le fond
+                ctx.fillStyle = appState.currentTheme === 'dark' ? 'rgba(26, 26, 46, 0.7)' : 'rgba(233, 236, 239, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Dessiner les barres du visualiseur
+                const barCount = 64;
+                const barWidth = canvas.width / barCount;
+                const isPlaying = appState.isPlaying;
+                
+                for (let i = 0; i < barCount; i++) {
+                    // Hauteur aléatoire avec animation si en lecture
+                    let barHeight;
+                    if (isPlaying) {
+                        barHeight = Math.random() * (canvas.height * 0.7) + (canvas.height * 0.1);
+                    } else {
+                        barHeight = Math.sin(Date.now() / 1000 + i * 0.2) * (canvas.height * 0.2) + (canvas.height * 0.3);
+                    }
+                    
+                    // Position
+                    const x = i * barWidth;
+                    const y = canvas.height - barHeight;
+                    
+                    // Dégradé de couleur
+                    const gradient = ctx.createLinearGradient(0, y, 0, canvas.height);
+                    gradient.addColorStop(0, `rgba(124, 58, 237, ${0.7 + Math.random() * 0.3})`);
+                    gradient.addColorStop(1, `rgba(16, 185, 129, ${0.3 + Math.random() * 0.3})`);
+                    
+                    // Dessiner la barre
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x + 1, y, barWidth - 2, barHeight);
+                }
+                
+                // Continuer l'animation
+                requestAnimationFrame(draw);
+            }
+            
+            draw();
+        }
+        
+        // Télécharger l'audio
+        function downloadAudio() {
+            showMessage("Téléchargement de l'ambiance sonore...", "info");
+            
+            // Dans une implémentation réelle, on générerait un fichier audio
+            // Pour cette démo, nous créons un fichier texte avec les instructions
+            const audioContent = `Ambiance sonore générée pour: "${appState.currentPrompt}"
+            
+Instructions pour recréer cette ambiance:
+- Fréquence de base: 220Hz
+- Type d'onde: Sinusoïdale
+- Modulation: LFO à 0.5Hz
+- Caractéristique: ${audioInfo.textContent}
+
+Ceci est une simulation. Dans une version complète, un vrai fichier audio serait généré.`;
+            
+            const blob = new Blob([audioContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ambiance-${Date.now()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            setTimeout(() => {
+                showMessage("Fichier audio téléchargé (version texte pour démo)", "success");
+            }, 500);
+        }
+        
+        // Partager l'univers
+        function shareUniverse() {
+            showMessage("Préparation du partage...", "info");
+            
+            // Utiliser html2canvas pour capturer les résultats
+            html2canvas(resultsSection).then(canvas => {
+                canvas.toBlob(blob => {
+                    if (navigator.share && navigator.canShare) {
+                        // Web Share API
+                        const file = new File([blob], 'univers-a-mots.png', { type: 'image/png' });
+                        
+                        if (navigator.canShare({ files: [file] })) {
+                            navigator.share({
+                                files: [file],
+                                title: 'Mon univers créé avec Univers à Mots',
+                                text: `J'ai créé cet univers: "${appState.currentPrompt}"`
+                            }).then(() => {
+                                showMessage("Univers partagé avec succès !", "success");
+                            }).catch(error => {
+                                console.error('Erreur de partage:', error);
+                                fallbackShare(canvas);
+                            });
+                        } else {
+                            fallbackShare(canvas);
+                        }
+                    } else {
+                        fallbackShare(canvas);
+                    }
+                });
+            });
+        }
+        
+        // Fallback pour le partage
+        function fallbackShare(canvas) {
+            // Télécharger l'image
+            const link = document.createElement('a');
+            link.download = `univers-a-mots-${Date.now()}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+            
+            showMessage("Image téléchargée. Vous pouvez la partager manuellement.", "success");
+        }
+        
+        // Tout télécharger
+        function downloadAll() {
+            showMessage("Préparation de l'archive...", "info");
+            
+            const zip = new JSZip();
+            
+            // Ajouter l'image
+            fetch(appState.currentImageUrl)
+                .then(response => response.blob())
+                .then(blob => {
+                    zip.file("univers-image.png", blob);
+                    
+                    // Ajouter le texte
+                    zip.file("univers-description.txt", `Univers créé avec "Univers à Mots"
+                    
+Prompt: "${appState.currentPrompt}"
+
+Description poétique:
+${appState.currentText}
+
+Palette de couleurs:
+${appState.currentColors.map(color => rgbToHex(color[0], color[1], color[2])).join(', ')}
+
+Date de création: ${new Date().toLocaleString()}
+`);
+                    
+                    // Ajouter les métadonnées
+                    const metadata = {
+                        prompt: appState.currentPrompt,
+                        colors: appState.currentColors,
+                        text: appState.currentText,
+                        date: new Date().toISOString()
+                    };
+                    
+                    zip.file("metadata.json", JSON.stringify(metadata, null, 2));
+                    
+                    // Générer et télécharger le ZIP
+                    zip.generateAsync({ type: "blob" })
+                        .then(content => {
+                            const link = document.createElement('a');
+                            link.href = URL.createObjectURL(content);
+                            link.download = `univers-a-mots-${Date.now()}.zip`;
+                            link.click();
+                            
+                            showMessage("Archive téléchargée avec succès !", "success");
+                        });
+                })
+                .catch(error => {
+                    console.error("Erreur lors de la création de l'archive:", error);
+                    showMessage("Erreur lors de la création de l'archive", "error");
+                });
+        }
+        
+        // Recréer un autre univers
+        function regenerateUniverse() {
+            promptInput.value = '';
+            promptInput.focus();
+            
+            // Cacher les résultats
+            resultsSection.classList.remove('active');
+            
+            // Réinitialiser les résultats
+            resetResults();
+            
+            showMessage("Prêt pour une nouvelle création !", "success");
+        }
+        
+        // Réinitialiser les résultats
+        function resetResults() {
+            // Image
+            generatedImage.classList.remove('active');
+            generatedImage.src = '';
+            imagePlaceholder.style.display = 'flex';
+            
+            // Couleurs
+            colorPalette.innerHTML = '<div class="placeholder-image"><i class="fas fa-fill-drip"></i><p>Les couleurs extraites de l\'image apparaîtront ici</p></div>';
+            
+            // Audio
+            stopAudio();
+            audioInfo.textContent = "Ambiance générée à partir de votre description";
+            audioDownload.href = "#";
+            audioDownload.onclick = null;
+            
+            // Texte
+            generatedText.classList.remove('active');
+            generatedText.textContent = '';
+            textPlaceholder.style.display = 'flex';
+        }
+        
+        // Mode démo (fallback)
+        function useDemoMode(prompt) {
+            // Utiliser des images de démo
+            const demoImageIndex = Math.floor(Math.random() * fallbackImages.length);
+            appState.currentImageUrl = fallbackImages[demoImageIndex];
+            
+            // Afficher l'image
+            imagePlaceholder.style.display = 'none';
+            generatedImage.src = appState.currentImageUrl;
+            generatedImage.classList.add('active');
+            
+            // Générer un texte
+            const demoTextIndex = Math.floor(Math.random() * poeticPhrases.default.length);
+            appState.currentText = poeticPhrases.default[demoTextIndex];
+            
+            textPlaceholder.style.display = 'none';
+            generatedText.textContent = appState.currentText;
+            generatedText.classList.add('active');
+            
+            // Générer un son
+            createSyntheticSound('default');
+            
+            // Extraire des couleurs de démo
+            const demoColors = [
+                [124, 58, 237], // Violet
+                [16, 185, 129], // Vert
+                [245, 158, 11], // Orange
+                [59, 130, 246], // Bleu
+                [239, 68, 68]   // Rouge
+            ];
+            
+            appState.currentColors = demoColors;
+            displayColorPalette(demoColors);
+        }
+        
+        // Afficher un message
+        function showMessage(text, type) {
+            message.textContent = text;
+            message.className = `message ${type} active`;
+            
+            // Cacher après quelques secondes
+            setTimeout(() => {
+                message.classList.remove('active');
+            }, 5000);
+        }
+        
+        // Gestion du redimensionnement de la fenêtre
+        window.addEventListener('resize', function() {
+            // Recalculer le visualiseur audio si nécessaire
+            if (audioVisualizer) {
+                updateAudioVisualizer();
+            }
+        });
+    </script>
+</body>
+</html>
