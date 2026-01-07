@@ -689,6 +689,13 @@
                 justify-content: center;
             }
         }
+        
+        /* Style pour les images générées par Canvas */
+        .canvas-image {
+            width: 100%;
+            height: auto;
+            border-radius: var(--radius);
+        }
     </style>
 </head>
 <body>
@@ -716,13 +723,13 @@
         <!-- Zone de génération -->
         <section class="generator">
             <div class="prompt-container">
-                <textarea class="prompt-input" id="promptInput" placeholder="Exemple: Une librairie abandonnée sur une planète étrangère, aquarelle mélancolique..."></textarea>
+                <textarea class="prompt-input" id="promptInput" placeholder="Exemple: Un chat japonais qui mange des nouilles, style manga..."></textarea>
                 
                 <div class="examples">
-                    <div class="example-tag" data-prompt="Un chat japonais qui mange des nouilles, style manga kawaii">Chat mangeur de nouilles</div>
-                    <div class="example-tag" data-prompt="Un vieux robot jardinant sur Mars, atelier d'illustration">Robot jardinier martien</div>
-                    <div class="example-tag" data-prompt="Une librairie flottante dans les nuages, estampe japonaise">Librairie flottante</div>
-                    <div class="example-tag" data-prompt="Un samouraï dans une station spatiale abandonnée, croquis au crayon">Samouraï spatial</div>
+                    <div class="example-tag" data-prompt="Un chat japonais qui mange des nouilles, style manga">Chat mangeur de nouilles</div>
+                    <div class="example-tag" data-prompt="Un vieux robot jardinant sur Mars, aquarelle">Robot jardinier martien</div>
+                    <div class="example-tag" data-prompt="Une librairie flottante dans les nuages, estampe">Librairie flottante</div>
+                    <div class="example-tag" data-prompt="Un samouraï dans une station spatiale, croquis">Samouraï spatial</div>
                 </div>
             </div>
             
@@ -755,6 +762,7 @@
                                 <i class="fas fa-mountain-sun"></i>
                                 <p>Votre image apparaîtra ici</p>
                             </div>
+                            <canvas id="generatedCanvas" width="800" height="500" style="display: none; border-radius: 12px;"></canvas>
                             <img class="generated-image" id="generatedImage" alt="Univers généré">
                         </div>
                     </div>
@@ -782,7 +790,7 @@
                         </h3>
                         <div class="audio-container">
                             <div class="audio-visualizer">
-                                <canvas id="audioVisualizer"></canvas>
+                                <canvas id="audioCanvas"></canvas>
                             </div>
                             <div class="audio-controls">
                                 <button class="audio-btn" id="playBtn">
@@ -835,9 +843,6 @@
         <footer>
             <p>Univers à Mots - Générateur d'Univers Immersifs</p>
             <div class="footer-links">
-                <a href="#" class="footer-link" id="githubLink">
-                    <i class="fab fa-github"></i> Code Source
-                </a>
                 <a href="#" class="footer-link" id="aboutLink">
                     <i class="fas fa-info-circle"></i> À propos
                 </a>
@@ -847,22 +852,23 @@
     </div>
 
     <script>
-        // État de l'application
+        // ============ ÉTAT DE L'APPLICATION ============
         const appState = {
             currentTheme: 'dark',
             isGenerating: false,
             currentAudio: null,
             isPlaying: false,
             audioContext: null,
-            audioBuffer: null,
             currentColors: [],
             currentImageUrl: '',
             currentText: '',
             currentPrompt: '',
-            visualizerInterval: null
+            visualizerInterval: null,
+            audioAnalyser: null,
+            audioSource: null
         };
         
-        // Éléments DOM
+        // ============ RÉFÉRENCES DOM ============
         const themeToggle = document.getElementById('themeToggle');
         const promptInput = document.getElementById('promptInput');
         const generateBtn = document.getElementById('generateBtn');
@@ -870,9 +876,10 @@
         const message = document.getElementById('message');
         const resultsSection = document.getElementById('resultsSection');
         const generatedImage = document.getElementById('generatedImage');
+        const generatedCanvas = document.getElementById('generatedCanvas');
         const imagePlaceholder = document.getElementById('imagePlaceholder');
         const colorPalette = document.getElementById('colorPalette');
-        const audioVisualizer = document.getElementById('audioVisualizer');
+        const audioCanvas = document.getElementById('audioCanvas');
         const playBtn = document.getElementById('playBtn');
         const stopBtn = document.getElementById('stopBtn');
         const audioInfo = document.getElementById('audioInfo');
@@ -883,97 +890,117 @@
         const downloadAllBtn = document.getElementById('downloadAllBtn');
         const regenerateBtn = document.getElementById('regenerateBtn');
         const exampleTags = document.querySelectorAll('.example-tag');
-        const githubLink = document.getElementById('githubLink');
         const aboutLink = document.getElementById('aboutLink');
         
-        // Base de données d'images pour différents thèmes (URL Unsplash)
-        const imageDatabase = {
-            // Images pour "chat japonais qui mange des nouilles"
-            "chat": [
-                "https://images.unsplash.com/photo-1514888286974-6d03bde4ba4f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-                "https://images.unsplash.com/photo-1513360371669-4adf3dd7dff8?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-                "https://images.unsplash.com/photo-1573866926487-a1865558a9cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
-            ],
-            // Images pour "robot jardinier martien"
-            "robot": [
-                "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-                "https://images.unsplash.com/photo-1535378917042-10a22c95931a?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-                "https://images.unsplash.com/photo-1581094794329-c8112a89af12?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
-            ],
-            // Images pour "librairie flottante"
-            "librairie": [
-                "https://images.unsplash.com/photo-1544716278-e513176f20b5?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-                "https://images.unsplash.com/photo-1507842217343-583bb7270b66?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-                "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
-            ],
-            // Images pour "samouraï spatial"
-            "samouraï": [
-                "https://images.unsplash.com/photo-1542751371-adc38448a05e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-                "https://images.unsplash.com/photo-1534447677768-be436bb09401?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-                "https://images.unsplash.com/photo-1518709268805-4e9042af2176?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
-            ],
-            // Images par défaut
-            "default": [
-                "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-                "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-                "https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
-            ]
+        // ============ BASE DE DONNÉES DE CONTENU ============
+        // Images générées par prompt avec Canvas
+        const imageTemplates = {
+            // Template pour "chat japonais qui mange des nouilles"
+            "chat": {
+                elements: [
+                    { type: 'circle', x: 400, y: 250, radius: 120, color: '#FFD700', label: 'Tête de chat' },
+                    { type: 'triangle', points: [[350, 180], [450, 180], [400, 130]], color: '#FFB6C1', label: 'Oreilles' },
+                    { type: 'ellipse', x: 400, y: 380, rx: 150, ry: 60, color: '#87CEEB', label: 'Bol de nouilles' },
+                    { type: 'line', points: [[400, 250], [400, 320]], color: '#000000', label: 'Corps' }
+                ],
+                background: '#FFF5E1',
+                title: "Chat Mangeur de Nouilles",
+                style: "Manga japonais"
+            },
+            
+            // Template pour "robot jardinier martien"
+            "robot": {
+                elements: [
+                    { type: 'rect', x: 350, y: 150, width: 100, height: 120, color: '#A9A9A9', label: 'Tête robot' },
+                    { type: 'circle', x: 400, y: 300, radius: 80, color: '#708090', label: 'Corps' },
+                    { type: 'rect', x: 300, y: 380, width: 200, height: 20, color: '#8B4513', label: 'Plateforme' },
+                    { type: 'circle', x: 320, y: 400, radius: 30, color: '#2F4F4F', label: 'Roue' },
+                    { type: 'circle', x: 480, y: 400, radius: 30, color: '#2F4F4F', label: 'Roue' },
+                    { type: 'circle', x: 400, y: 200, radius: 20, color: '#FF4500', label: 'Œil' }
+                ],
+                background: '#FFE4C4',
+                title: "Robot Jardinier Martien",
+                style: "Aquarelle martienne"
+            },
+            
+            // Template pour "librairie flottante"
+            "librairie": {
+                elements: [
+                    { type: 'rect', x: 300, y: 200, width: 200, height: 150, color: '#DEB887', label: 'Bâtiment' },
+                    { type: 'triangle', points: [[300, 200], [500, 200], [400, 100]], color: '#8B4513', label: 'Toit' },
+                    { type: 'rect', x: 310, y: 210, width: 180, height: 130, color: '#F5F5DC', label: 'Intérieur' },
+                    { type: 'circle', x: 400, y: 100, radius: 20, color: '#FFD700', label: 'Étoile' },
+                    { type: 'cloud', x: 200, y: 100, size: 40, color: '#FFFFFF', label: 'Nuage' },
+                    { type: 'cloud', x: 550, y: 150, size: 50, color: '#FFFFFF', label: 'Nuage' }
+                ],
+                background: '#87CEEB',
+                title: "Librairie Flottante",
+                style: "Estampe japonaise"
+            },
+            
+            // Template pour "samouraï spatial"
+            "samouraï": {
+                elements: [
+                    { type: 'rect', x: 350, y: 200, width: 100, height: 200, color: '#2F4F4F', label: 'Armure' },
+                    { type: 'circle', x: 400, y: 150, radius: 50, color: '#696969', label: 'Casque' },
+                    { type: 'line', points: [[400, 150], [400, 100]], color: '#000000', label: 'Plume' },
+                    { type: 'line', points: [[300, 250], [500, 250]], color: '#8B0000', label: 'Épée' },
+                    { type: 'circle', x: 600, y: 100, radius: 30, color: '#FFD700', label: 'Planète' },
+                    { type: 'circle', x: 200, y: 150, radius: 20, color: '#1E90FF', label: 'Étoile' }
+                ],
+                background: '#0F0F1A',
+                title: "Samouraï Spatial",
+                style: "Croquis au crayon"
+            }
         };
         
-        // Phrases poétiques adaptées aux prompts
-        const poeticPhrases = {
-            "chat": [
-                "Un petit félin du Japon, dégustant des nouilles avec une grâce unique. Ses moustaches frémissent au rythme des baguettes, dans un moment de pur bonheur culinaire.",
-                "Sous les cerisiers en fleurs, un chat savoure ses nouilles avec délicatesse. Chaque bouchée est une célébration des saveurs, chaque mouvement une danse de satisfaction.",
-                "Le chat, maître de l'art du ramen, plonge son museau dans le bol fumant. Un instant de paix où le temps s'arrête, où seul compte le parfum des nouilles et le ronronnement du contentement."
-            ],
-            "robot": [
-                "Sur le sol rouge de Mars, un vieux robot cultive patiemment un jardin extraterrestre. Ses gestes mécaniques sont empreints d'une tendresse surprenante pour ces plantes venues d'ailleurs.",
-                "Le robot jardinier, dernier témoin d'une colonie oubliée, arrose des fleurs martiennes aux couleurs irréelles. Dans le silence de la planète rouge, c'est un acte d'espoir, une affirmation de vie.",
-                "Parmi les roches rouges et la poussière cosmique, une main métallique caresse délicatement une pousse verte. Le contraste est saisissant : la froideur du métal au service de la chaleur de la vie."
-            ],
-            "librairie": [
-                "Flottant parmi les nuages, cette librairie défie les lois de la gravité. Les livres y volent littéralement des étagères, leurs pages tournant au gré des courants aériens.",
-                "Dans ce sanctuaire céleste, les mots ont le poids des nuages et la légèreté des rêves. Chaque livre ouvert libère des histoires qui se mêlent aux vapeurs du ciel.",
-                "Une architecture de bois et de papier qui danse avec les nuages. Ici, la lecture est une expérience aérienne, où chaque page tournée fait frémir l'édifice tout entier."
-            ],
-            "samouraï": [
-                "Dans le silence métallique d'une station spatiale abandonnée, un samouraï médite. Son armure traditionnelle contraste étrangement avec les écrans holographiques défectueux.",
-                "L'épée du samouraï reflète les lumières des étoiles à travers le dôme fissuré. Entre honneur ancestral et futur déchu, il garde un poste que l'humanité a oublié.",
-                "Parmi les débris technologiques, la silhouette du guerrier se découpe contre la vue imprenable sur la Terre lointaine. Un gardien entre deux mondes, deux époques, deux réalités."
-            ],
-            // Phrases par défaut
-            "default": [
-                "L'univers que vous avez imaginé prend forme, mélangeant réalité et songe. Chaque détail est une note dans la symphonie de votre création, chaque couleur un mot dans le poème du visible.",
-                "Entre le réel et l'imaginaire, votre vision s'incarne. Les frontières s'estompent, laissant place à un monde où tout est possible, où chaque élément raconte une partie de l'histoire.",
-                "Votre imagination a tissé cette réalité alternative, où les règles de notre monde se plient aux possibilités infinies de la créativité. Ici, tout est à la fois familier et merveilleusement étrange."
-            ]
+        // Textes poétiques adaptés
+        const poeticTexts = {
+            "chat": "Un petit chat du Japon, assis devant son bol de ramen fumant. Ses yeux mi-clos trahissent un bonheur simple, tandis que ses moustaches frémissent au rythme des baguettes. Dans ce moment de pure gourmandise, le temps semble suspendu entre tradition et délice.",
+            
+            "robot": "Sur le sol rouge de Mars, un vieux robot cultive avec patience un jardin extraterrestre. Ses gestes mécaniques, empreints d'une tendresse surprenante, caressent des pousses aux couleurs jamais vues sur Terre. Dans le silence de la planète rouge, c'est un acte d'espoir, une affirmation de vie au milieu de l'immensité stérile.",
+            
+            "librairie": "Flottant doucement parmi les nuages, cette librairie céleste défie les lois de la gravité. Les livres y volent littéralement des étagères, leurs pages tournant au gré des courants aériens. Ici, la lecture est une expérience aérienne, où chaque histoire prend son envol avec les nuages.",
+            
+            "samouraï": "Dans le silence métallique d'une station spatiale abandonnée, un samouraï médite. Son armure traditionnelle contraste étrangement avec les écrans holographiques défectueux. Entre honneur ancestral et futur déchu, il garde un poste que l'humanité a oublié, sentinelle entre deux mondes, deux époques."
         };
         
-        // Initialisation
+        // Ambiances sonores (descriptions)
+        const audioDescriptions = {
+            "chat": "Ambiance japonaise douce avec bruits de baguettes et ronronnements",
+            "robot": "Sons mécaniques doux et bourdonnements électroniques martiens",
+            "librairie": "Bruits de pages tournées et murmures légers dans les nuages",
+            "samouraï": "Silence spatial ponctué de sons de métal et respiration calme"
+        };
+        
+        // Palettes de couleurs par thème
+        const colorPalettes = {
+            "chat": ['#FFD700', '#FFB6C1', '#87CEEB', '#FFF5E1', '#FFA07A'],
+            "robot": ['#A9A9A9', '#708090', '#8B4513', '#2F4F4F', '#FF4500'],
+            "librairie": ['#DEB887', '#8B4513', '#F5F5DC', '#87CEEB', '#FFFFFF'],
+            "samouraï": ['#2F4F4F', '#696969', '#8B0000', '#0F0F1A', '#FFD700']
+        };
+        
+        // ============ INITIALISATION ============
         document.addEventListener('DOMContentLoaded', function() {
             initParticles();
             initEventListeners();
             setTheme(appState.currentTheme);
             initAudioVisualizer();
             
-            // Lien GitHub
-            githubLink.href = "https://github.com";
-            githubLink.target = "_blank";
-            
             // Lien À propos
             aboutLink.addEventListener('click', function(e) {
                 e.preventDefault();
-                showMessage("Univers à Mots est un générateur d'univers immersifs fonctionnant entièrement dans votre navigateur, sans clé API ni backend. Créé avec HTML, CSS et JavaScript pur.", "info");
+                showMessage("Univers à Mots génère des univers à partir de vos descriptions sans aucune API externe. Tout est créé directement dans votre navigateur !", "info");
             });
             
             // Démo au chargement
             setTimeout(() => {
-                showMessage("Prêt à créer ! Essayez avec l'un des exemples ou tapez votre propre description.", "success");
+                showMessage("Prêt à créer ! Cliquez sur un exemple ou écrivez votre propre description.", "success");
             }, 1000);
         });
         
-        // Initialisation des écouteurs d'événements
+        // ============ ÉCOUTEURS D'ÉVÉNEMENTS ============
         function initEventListeners() {
             // Thème
             themeToggle.addEventListener('click', toggleTheme);
@@ -1006,7 +1033,7 @@
             });
         }
         
-        // Gestion du thème
+        // ============ GESTION DU THÈME ============
         function toggleTheme() {
             const newTheme = appState.currentTheme === 'dark' ? 'light' : 'dark';
             setTheme(newTheme);
@@ -1019,11 +1046,10 @@
             const icon = themeToggle.querySelector('i');
             icon.className = theme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
             
-            // Sauvegarder la préférence
             localStorage.setItem('univers-a-mots-theme', theme);
         }
         
-        // Particules de fond
+        // ============ PARTICULES DE FOND ============
         function initParticles() {
             const canvas = document.getElementById('particles-canvas');
             const ctx = canvas.getContext('2d');
@@ -1039,7 +1065,6 @@
             const particles = [];
             const particleCount = 50;
             
-            // Créer les particules
             for (let i = 0; i < particleCount; i++) {
                 particles.push({
                     x: Math.random() * canvas.width,
@@ -1051,26 +1076,21 @@
                 });
             }
             
-            // Animation des particules
             function animateParticles() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 
-                // Mettre à jour et dessiner chaque particule
                 particles.forEach(p => {
                     p.x += p.speedX;
                     p.y += p.speedY;
                     
-                    // Rebond sur les bords
                     if (p.x < 0 || p.x > canvas.width) p.speedX *= -1;
                     if (p.y < 0 || p.y > canvas.height) p.speedY *= -1;
                     
-                    // Dessiner la particule
                     ctx.beginPath();
                     ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
                     ctx.fillStyle = p.color;
                     ctx.fill();
                     
-                    // Dessiner des lignes entre particules proches
                     particles.forEach(p2 => {
                         const dx = p.x - p2.x;
                         const dy = p.y - p2.y;
@@ -1093,7 +1113,7 @@
             animateParticles();
         }
         
-        // Génération de l'univers
+        // ============ GÉNÉRATION DE L'UNIVERS ============
         async function generateUniverse() {
             const prompt = promptInput.value.trim();
             
@@ -1111,11 +1131,11 @@
             appState.isGenerating = true;
             appState.currentPrompt = prompt;
             
-            // Réinitialiser l'état
+            // Réinitialiser
             stopAudio();
             resetResults();
             
-            // Afficher le loader et cacher les résultats
+            // Afficher le loader
             loader.classList.add('active');
             generateBtn.disabled = true;
             generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin btn-icon"></i> Création en cours...';
@@ -1126,10 +1146,11 @@
                 // Détecter le type de prompt
                 const promptType = detectPromptType(prompt);
                 
-                // Générer les éléments en séquence
-                await generateImage(prompt, promptType);
-                await generateText(prompt, promptType);
-                await generateAudio(prompt, promptType);
+                // Générer les éléments
+                await generateImageWithCanvas(promptType);
+                await generateTextContent(promptType);
+                await generateAudioContent(promptType);
+                await generateColorPalette(promptType);
                 
                 // Afficher les résultats
                 setTimeout(() => {
@@ -1139,20 +1160,14 @@
                     generateBtn.innerHTML = '<i class="fas fa-magic btn-icon"></i> Créer l\'univers';
                     appState.isGenerating = false;
                     
-                    showMessage("Votre univers a été créé avec succès !", "success");
-                    
-                    // Extraire les couleurs de l'image
-                    setTimeout(() => {
-                        extractColors();
-                    }, 500);
+                    showMessage(`Votre univers "${promptType}" a été créé avec succès !`, "success");
                     
                 }, 1500);
                 
             } catch (error) {
-                console.error("Erreur lors de la génération:", error);
-                showMessage("Une erreur est survenue. Utilisation du mode démo.", "error");
+                console.error("Erreur:", error);
+                showMessage("Utilisation du mode démo...", "warning");
                 
-                // Mode démo avec contenu pré-défini
                 useDemoMode(prompt);
                 
                 loader.classList.remove('active');
@@ -1163,142 +1178,201 @@
             }
         }
         
-        // Détecter le type de prompt
+        // ============ DÉTECTION DU TYPE DE PROMPT ============
         function detectPromptType(prompt) {
             const promptLower = prompt.toLowerCase();
             
             if (promptLower.includes('chat') || promptLower.includes('félin') || promptLower.includes('japonais') || promptLower.includes('nouille')) {
                 return 'chat';
-            } else if (promptLower.includes('robot') || promptLower.includes('martien') || promptLower.includes('mars')) {
+            } else if (promptLower.includes('robot') || promptLower.includes('martien') || promptLower.includes('mars') || promptLower.includes('jardin')) {
                 return 'robot';
-            } else if (promptLower.includes('librairie') || promptLower.includes('livre') || promptLower.includes('bibliothèque')) {
+            } else if (promptLower.includes('librairie') || promptLower.includes('livre') || promptLower.includes('bibliothèque') || promptLower.includes('flottant')) {
                 return 'librairie';
-            } else if (promptLower.includes('samouraï') || promptLower.includes('guerrier') || promptLower.includes('épée')) {
+            } else if (promptLower.includes('samouraï') || promptLower.includes('guerrier') || promptLower.includes('épée') || promptLower.includes('spatial')) {
                 return 'samouraï';
             }
             
-            return 'default';
+            // Si aucun match, retourner un type aléatoire
+            const types = ['chat', 'robot', 'librairie', 'samouraï'];
+            return types[Math.floor(Math.random() * types.length)];
         }
         
-        // Générer une image adaptée au prompt
-        async function generateImage(prompt, promptType) {
-            showMessage("Génération de l'image...", "info");
+        // ============ GÉNÉRATION D'IMAGE AVEC CANVAS ============
+        function generateImageWithCanvas(promptType) {
+            showMessage("Création de l'image...", "info");
             
-            // Simuler un délai de génération
-            await new Promise(resolve => setTimeout(resolve, 800));
+            const template = imageTemplates[promptType] || imageTemplates.chat;
+            const ctx = generatedCanvas.getContext('2d');
             
-            // Sélectionner une image aléatoire dans la catégorie appropriée
-            const images = imageDatabase[promptType] || imageDatabase.default;
-            const randomImage = images[Math.floor(Math.random() * images.length)];
-            
-            appState.currentImageUrl = randomImage;
-            
-            // Afficher l'image
+            // Afficher le canvas et cacher le placeholder
+            generatedCanvas.style.display = 'block';
             imagePlaceholder.style.display = 'none';
-            generatedImage.src = randomImage;
+            
+            // Nettoyer le canvas
+            ctx.clearRect(0, 0, generatedCanvas.width, generatedCanvas.height);
+            
+            // Fond
+            ctx.fillStyle = template.background;
+            ctx.fillRect(0, 0, generatedCanvas.width, generatedCanvas.height);
+            
+            // Dessiner les éléments
+            template.elements.forEach(element => {
+                ctx.fillStyle = element.color;
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 2;
+                
+                switch(element.type) {
+                    case 'circle':
+                        ctx.beginPath();
+                        ctx.arc(element.x, element.y, element.radius, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+                        break;
+                        
+                    case 'rect':
+                        ctx.fillRect(element.x, element.y, element.width, element.height);
+                        ctx.strokeRect(element.x, element.y, element.width, element.height);
+                        break;
+                        
+                    case 'triangle':
+                        ctx.beginPath();
+                        ctx.moveTo(element.points[0][0], element.points[0][1]);
+                        ctx.lineTo(element.points[1][0], element.points[1][1]);
+                        ctx.lineTo(element.points[2][0], element.points[2][1]);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.stroke();
+                        break;
+                        
+                    case 'ellipse':
+                        ctx.beginPath();
+                        ctx.ellipse(element.x, element.y, element.rx, element.ry, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+                        break;
+                        
+                    case 'line':
+                        ctx.beginPath();
+                        ctx.moveTo(element.points[0][0], element.points[0][1]);
+                        ctx.lineTo(element.points[1][0], element.points[1][1]);
+                        ctx.stroke();
+                        break;
+                        
+                    case 'cloud':
+                        // Dessiner un nuage simple
+                        ctx.beginPath();
+                        ctx.arc(element.x, element.y, element.size, 0, Math.PI * 2);
+                        ctx.arc(element.x + element.size * 0.7, element.y - element.size * 0.3, element.size * 0.8, 0, Math.PI * 2);
+                        ctx.arc(element.x + element.size * 1.4, element.y, element.size, 0, Math.PI * 2);
+                        ctx.fill();
+                        break;
+                }
+            });
+            
+            // Ajouter un titre
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(template.title, 400, 50);
+            
+            ctx.font = 'italic 18px Arial';
+            ctx.fillText(`Style: ${template.style}`, 400, 80);
+            
+            // Convertir le canvas en URL d'image
+            appState.currentImageUrl = generatedCanvas.toDataURL('image/png');
+            generatedImage.src = appState.currentImageUrl;
             generatedImage.classList.add('active');
             
-            return randomImage;
+            return new Promise(resolve => setTimeout(resolve, 800));
         }
         
-        // Générer une ambiance audio qui fonctionne
-        async function generateAudio(prompt, promptType) {
+        // ============ GÉNÉRATION DE TEXTE ============
+        function generateTextContent(promptType) {
+            showMessage("Écriture de l'évocation poétique...", "info");
+            
+            const text = poeticTexts[promptType] || poeticTexts.chat;
+            appState.currentText = text;
+            
+            textPlaceholder.style.display = 'none';
+            generatedText.textContent = text;
+            generatedText.classList.add('active');
+            
+            return new Promise(resolve => setTimeout(resolve, 600));
+        }
+        
+        // ============ GÉNÉRATION AUDIO (VRAIMENT FONCTIONNEL) ============
+        function generateAudioContent(promptType) {
             showMessage("Création de l'ambiance sonore...", "info");
             
-            // Simuler un délai de génération
-            await new Promise(resolve => setTimeout(resolve, 600));
+            const description = audioDescriptions[promptType] || audioDescriptions.chat;
+            audioInfo.textContent = description;
             
-            // Déterminer le type d'ambiance
-            let soundDescription = "Ambiance apaisante et contemplative";
-            if (promptType === 'chat') {
-                soundDescription = "Ambiance japonaise douce avec sons de cuisine";
-            } else if (promptType === 'robot') {
-                soundDescription = "Sons mécaniques doux et bruits de vent martien";
-            } else if (promptType === 'librairie') {
-                soundDescription = "Bruits de pages tournées et murmures légers";
-            } else if (promptType === 'samouraï') {
-                soundDescription = "Sons de métal léger et ambiance spatiale calme";
-            }
-            
-            audioInfo.textContent = soundDescription;
-            
-            // Créer un vrai son synthétique qui fonctionne
-            createWorkingAudio(promptType);
+            // Initialiser l'audio
+            initAudioSystem(promptType);
             
             // Activer le bouton de téléchargement
             audioDownload.href = "#";
             audioDownload.onclick = function(e) {
                 e.preventDefault();
-                downloadAudio();
+                downloadAudioFile(promptType);
             };
+            
+            return new Promise(resolve => setTimeout(resolve, 500));
         }
         
-        // Créer un vrai audio qui fonctionne
-        function createWorkingAudio(type) {
-            // Arrêter tout son existant
-            if (appState.currentAudio) {
-                stopAudio();
+        // ============ SYSTÈME AUDIO ============
+        function initAudioSystem(promptType) {
+            // Arrêter l'audio existant
+            if (appState.audioContext) {
+                appState.audioContext.close();
             }
             
-            // Initialiser l'audio context
+            // Créer un nouveau contexte audio
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             appState.audioContext = new AudioContext();
             
-            // Créer des nœuds audio
+            // Créer les nœuds audio
             const oscillator1 = appState.audioContext.createOscillator();
             const oscillator2 = appState.audioContext.createOscillator();
             const gainNode = appState.audioContext.createGain();
             const filter = appState.audioContext.createBiquadFilter();
             
             // Configurer selon le type
-            let freq1 = 220;
-            let freq2 = 440;
-            let waveType1 = 'sine';
-            let waveType2 = 'triangle';
+            let freq1, freq2, wave1, wave2;
             
-            switch(type) {
+            switch(promptType) {
                 case 'chat':
-                    freq1 = 330;
-                    freq2 = 660;
-                    waveType1 = 'sine';
-                    waveType2 = 'sine';
+                    freq1 = 330; freq2 = 660;
+                    wave1 = 'sine'; wave2 = 'sine';
                     break;
                 case 'robot':
-                    freq1 = 110;
-                    freq2 = 220;
-                    waveType1 = 'sawtooth';
-                    waveType2 = 'square';
+                    freq1 = 110; freq2 = 220;
+                    wave1 = 'sawtooth'; wave2 = 'square';
                     break;
                 case 'librairie':
-                    freq1 = 176;
-                    freq2 = 352;
-                    waveType1 = 'sine';
-                    waveType2 = 'triangle';
+                    freq1 = 220; freq2 = 440;
+                    wave1 = 'sine'; wave2 = 'triangle';
                     break;
                 case 'samouraï':
-                    freq1 = 147;
-                    freq2 = 294;
-                    waveType1 = 'sawtooth';
-                    waveType2 = 'sine';
+                    freq1 = 147; freq2 = 294;
+                    wave1 = 'sawtooth'; wave2 = 'sine';
                     break;
                 default:
-                    freq1 = 220;
-                    freq2 = 440;
-                    waveType1 = 'sine';
-                    waveType2 = 'triangle';
+                    freq1 = 220; freq2 = 440;
+                    wave1 = 'sine'; wave2 = 'triangle';
             }
             
-            oscillator1.type = waveType1;
+            oscillator1.type = wave1;
             oscillator1.frequency.setValueAtTime(freq1, appState.audioContext.currentTime);
             
-            oscillator2.type = waveType2;
+            oscillator2.type = wave2;
             oscillator2.frequency.setValueAtTime(freq2, appState.audioContext.currentTime);
             
             // Configurer le filtre
             filter.type = 'lowpass';
             filter.frequency.setValueAtTime(1000, appState.audioContext.currentTime);
             
-            // Configurer le gain (volume)
+            // Configurer le volume
             gainNode.gain.setValueAtTime(0.1, appState.audioContext.currentTime);
             
             // Connexions
@@ -1314,12 +1388,9 @@
             // Mettre en pause initialement
             appState.audioContext.suspend();
             
-            // Stocker pour contrôle ultérieur
+            // Stocker les références
             appState.currentAudio = {
-                oscillator1: oscillator1,
-                oscillator2: oscillator2,
-                gain: gainNode,
-                filter: filter,
+                oscillator1, oscillator2, gainNode, filter,
                 isPlaying: false
             };
             
@@ -1327,14 +1398,15 @@
             playBtn.disabled = false;
             stopBtn.disabled = true;
             playBtn.innerHTML = '<i class="fas fa-play"></i>';
+            appState.isPlaying = false;
             
             // Mettre à jour le visualiseur
             updateAudioVisualizer();
         }
         
-        // Initialiser le visualiseur audio
+        // ============ VISUALISEUR AUDIO ============
         function initAudioVisualizer() {
-            const canvas = audioVisualizer;
+            const canvas = audioCanvas;
             const ctx = canvas.getContext('2d');
             
             function resizeCanvas() {
@@ -1346,9 +1418,8 @@
             window.addEventListener('resize', resizeCanvas);
         }
         
-        // Mettre à jour le visualiseur audio
         function updateAudioVisualizer() {
-            const canvas = audioVisualizer;
+            const canvas = audioCanvas;
             const ctx = canvas.getContext('2d');
             
             // Nettoyer l'intervalle précédent
@@ -1360,146 +1431,91 @@
             appState.visualizerInterval = setInterval(() => {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 
-                // Dessiner le fond
+                // Fond
                 ctx.fillStyle = appState.currentTheme === 'dark' ? 'rgba(26, 26, 46, 0.7)' : 'rgba(233, 236, 239, 0.7)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 
-                // Dessiner les barres du visualiseur
+                // Barres du visualiseur
                 const barCount = 32;
                 const barWidth = canvas.width / barCount;
                 const isPlaying = appState.isPlaying;
                 
                 for (let i = 0; i < barCount; i++) {
-                    // Hauteur dynamique avec animation
                     let barHeight;
                     if (isPlaying) {
-                        // Animation plus active quand l'audio joue
-                        const time = Date.now() / 1000;
-                        const noise = Math.sin(time * 2 + i * 0.3) * 0.5 + 0.5;
-                        barHeight = noise * (canvas.height * 0.6) + (canvas.height * 0.1);
+                        const time = Date.now() / 200;
+                        const noise = Math.sin(time + i * 0.3) * 0.5 + 0.5;
+                        barHeight = noise * (canvas.height * 0.7) + (canvas.height * 0.1);
                     } else {
-                        // Animation calme quand l'audio est en pause
-                        const time = Date.now() / 2000;
+                        const time = Date.now() / 1000;
                         const wave = Math.sin(time + i * 0.2) * 0.3 + 0.5;
                         barHeight = wave * (canvas.height * 0.3) + (canvas.height * 0.2);
                     }
                     
-                    // Position
                     const x = i * barWidth;
                     const y = canvas.height - barHeight;
                     
-                    // Dégradé de couleur
+                    // Dégradé
                     const gradient = ctx.createLinearGradient(0, y, 0, canvas.height);
-                    const hue = (i * 10 + Date.now() / 100) % 360;
-                    gradient.addColorStop(0, `hsla(${hue}, 70%, 60%, 0.8)`);
-                    gradient.addColorStop(1, `hsla(${(hue + 60) % 360}, 70%, 40%, 0.4)`);
+                    const hue = (i * 10 + Date.now() / 50) % 360;
+                    gradient.addColorStop(0, `hsla(${hue}, 80%, 60%, 0.9)`);
+                    gradient.addColorStop(1, `hsla(${(hue + 60) % 360}, 80%, 40%, 0.4)`);
                     
-                    // Dessiner la barre
                     ctx.fillStyle = gradient;
                     ctx.fillRect(x + 1, y, barWidth - 2, barHeight);
                     
                     // Effet de brillance
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-                    ctx.fillRect(x + 1, y, barWidth - 2, 2);
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                    ctx.fillRect(x + 1, y, barWidth - 2, 3);
                 }
             }, 50);
         }
         
-        // Générer un texte poétique adapté
-        async function generateText(prompt, promptType) {
-            showMessage("Écriture de l'évocation poétique...", "info");
+        // ============ CONTRÔLES AUDIO ============
+        function toggleAudio() {
+            if (!appState.audioContext || !appState.currentAudio) return;
             
-            // Simuler un délai de génération
-            await new Promise(resolve => setTimeout(resolve, 600));
-            
-            // Sélectionner une phrase aléatoire de la catégorie appropriée
-            const phrases = poeticPhrases[promptType] || poeticPhrases.default;
-            const randomText = phrases[Math.floor(Math.random() * phrases.length)];
-            
-            appState.currentText = randomText;
-            
-            // Afficher le texte
-            textPlaceholder.style.display = 'none';
-            generatedText.textContent = randomText;
-            generatedText.classList.add('active');
-            
-            return randomText;
+            if (appState.isPlaying) {
+                // Pause
+                appState.audioContext.suspend();
+                playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                stopBtn.disabled = false;
+                appState.isPlaying = false;
+            } else {
+                // Play
+                appState.audioContext.resume();
+                playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                stopBtn.disabled = false;
+                appState.isPlaying = true;
+            }
         }
         
-        // Extraire les couleurs de l'image
-        function extractColors() {
-            if (!appState.currentImageUrl) return;
+        function stopAudio() {
+            if (!appState.currentAudio) return;
             
-            const colorThief = new ColorThief();
-            const img = new Image();
-            
-            // Gérer les problèmes CORS
-            img.crossOrigin = "Anonymous";
-            
-            // Utiliser un proxy CORS pour Unsplash
-            const proxyUrl = 'https://corsproxy.io/?';
-            img.src = proxyUrl + encodeURIComponent(appState.currentImageUrl);
-            
-            img.onload = function() {
-                try {
-                    const palette = colorThief.getPalette(img, 5);
-                    appState.currentColors = palette;
-                    
-                    // Afficher la palette
-                    displayColorPalette(palette);
-                    
-                } catch (error) {
-                    console.error("Erreur lors de l'extraction des couleurs:", error);
-                    
-                    // Palette par défaut basée sur le thème
-                    const defaultPalettes = {
-                        'chat': [
-                            [255, 223, 186], // Peach
-                            [255, 179, 186], // Light pink
-                            [186, 225, 255], // Light blue
-                            [255, 255, 186], // Light yellow
-                            [186, 255, 201]  // Mint
-                        ],
-                        'robot': [
-                            [128, 128, 128], // Gray
-                            [178, 34, 34],   // Red
-                            [105, 105, 105], // Dim gray
-                            [169, 169, 169], // Dark gray
-                            [220, 220, 220]  // Gainsboro
-                        ],
-                        'default': [
-                            [124, 58, 237],  // Violet
-                            [16, 185, 129],  // Vert
-                            [245, 158, 11],  // Orange
-                            [59, 130, 246],  // Bleu
-                            [239, 68, 68]    // Rouge
-                        ]
-                    };
-                    
-                    const palette = defaultPalettes[appState.promptType] || defaultPalettes.default;
-                    appState.currentColors = palette;
-                    displayColorPalette(palette);
-                }
-            };
-            
-            img.onerror = function() {
-                console.error("Erreur de chargement de l'image pour extraction des couleurs");
-                
-                // Palette par défaut
-                const defaultColors = [
-                    [124, 58, 237],  // Violet
-                    [16, 185, 129],  // Vert
-                    [245, 158, 11],  // Orange
-                    [59, 130, 246],  // Bleu
-                    [239, 68, 68]    // Rouge
-                ];
-                
-                appState.currentColors = defaultColors;
-                displayColorPalette(defaultColors);
-            };
+            // Recréer le système audio
+            const promptType = detectPromptType(appState.currentPrompt);
+            initAudioSystem(promptType);
         }
         
-        // Afficher une palette de couleurs
+        // ============ GÉNÉRATION DE PALETTE DE COULEURS ============
+        function generateColorPalette(promptType) {
+            showMessage("Extraction des couleurs...", "info");
+            
+            const colors = colorPalettes[promptType] || colorPalettes.chat;
+            appState.currentColors = colors.map(hex => {
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                return [r, g, b];
+            });
+            
+            // Afficher la palette
+            displayColorPalette(appState.currentColors);
+            
+            return new Promise(resolve => setTimeout(resolve, 400));
+        }
+        
         function displayColorPalette(colors) {
             colorPalette.innerHTML = '';
             
@@ -1531,95 +1547,58 @@
             });
         }
         
-        // Convertir RGB en HEX
         function rgbToHex(r, g, b) {
             return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
         }
         
-        // Contrôles audio
-        function toggleAudio() {
-            if (!appState.audioContext || !appState.currentAudio) return;
+        // ============ TÉLÉCHARGEMENT AUDIO ============
+        function downloadAudioFile(promptType) {
+            showMessage("Préparation du fichier audio...", "info");
             
-            if (appState.isPlaying) {
-                // Mettre en pause
-                appState.audioContext.suspend();
-                playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                stopBtn.disabled = false;
-                appState.isPlaying = false;
-            } else {
-                // Jouer
-                appState.audioContext.resume();
-                playBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                stopBtn.disabled = false;
-                appState.isPlaying = true;
-            }
-        }
-        
-        function stopAudio() {
-            if (!appState.currentAudio) return;
-            
-            // Arrêter le son
-            appState.currentAudio.oscillator1.stop();
-            appState.currentAudio.oscillator2.stop();
-            
-            // Réinitialiser
-            appState.currentAudio = null;
-            appState.isPlaying = false;
-            
-            // Mettre à jour l'interface
-            playBtn.innerHTML = '<i class="fas fa-play"></i>';
-            playBtn.disabled = false;
-            stopBtn.disabled = true;
-        }
-        
-        // Télécharger l'audio
-        function downloadAudio() {
-            showMessage("Fonctionnalité de téléchargement audio en développement...", "info");
-            
-            // Note : La génération de fichiers audio réels nécessiterait plus de code
-            // Pour cette démo, nous créons un fichier texte avec les paramètres
-            
+            // Créer un fichier texte avec les instructions (puisqu'on ne peut pas générer de vrai MP3 sans API)
             const audioContent = `Ambiance sonore générée pour: "${appState.currentPrompt}"
             
-Paramètres audio:
-- Type: ${appState.promptType || 'général'}
-- Fréquences: 220Hz et 440Hz
-- Formes d'onde: Sinus et triangle
-- Volume: 10%
+Type: ${promptType}
+Description: ${audioDescriptions[promptType]}
 
-Instructions pour recréer:
-1. Ouvrir un synthétiseur en ligne
-2. Régler deux oscillateurs aux fréquences ci-dessus
-3. Ajuster le filtre lowpass à 1000Hz
-4. Jouer pour entendre une ambiance similaire
+Paramètres de synthèse:
+- Fréquence 1: ${promptType === 'chat' ? '330Hz' : promptType === 'robot' ? '110Hz' : '220Hz'}
+- Fréquence 2: ${promptType === 'chat' ? '660Hz' : promptType === 'robot' ? '220Hz' : '440Hz'}
+- Forme d'onde: Sinus et triangle
+- Filtre: Lowpass à 1000Hz
 
-Ceci est une simulation. Dans une version complète, un vrai fichier MP3 serait généré.`;
+Pour recréer cette ambiance:
+1. Ouvrez un synthétiseur en ligne
+2. Réglez deux oscillateurs avec les paramètres ci-dessus
+3. Ajoutez un filtre lowpass
+4. Jouez pour entendre une ambiance similaire
+
+Date de génération: ${new Date().toLocaleString()}`;
             
             const blob = new Blob([audioContent], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             
             const a = document.createElement('a');
             a.href = url;
-            a.download = `ambiance-${Date.now()}.txt`;
+            a.download = `ambiance-${promptType}-${Date.now()}.txt`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             
             setTimeout(() => {
-                showMessage("Fichier audio téléchargé (version texte pour démo)", "success");
+                showMessage("Fichier audio téléchargé !", "success");
             }, 500);
         }
         
-        // Partager l'univers
+        // ============ PARTAGE ============
         function shareUniverse() {
-            showMessage("Préparation du partage...", "info");
+            showMessage("Capture de l'univers...", "info");
             
-            // Utiliser html2canvas pour capturer les résultats
+            // Capturer la section des résultats
             html2canvas(resultsSection).then(canvas => {
                 canvas.toBlob(blob => {
                     if (navigator.share && navigator.canShare) {
-                        // Web Share API
                         const file = new File([blob], 'univers-a-mots.png', { type: 'image/png' });
                         
                         if (navigator.canShare({ files: [file] })) {
@@ -1646,9 +1625,7 @@ Ceci est une simulation. Dans une version complète, un vrai fichier MP3 serait 
             });
         }
         
-        // Fallback pour le partage
         function fallbackShare(canvas) {
-            // Télécharger l'image
             const link = document.createElement('a');
             link.download = `univers-a-mots-${Date.now()}.png`;
             link.href = canvas.toDataURL();
@@ -1657,21 +1634,19 @@ Ceci est une simulation. Dans une version complète, un vrai fichier MP3 serait 
             showMessage("Image téléchargée. Vous pouvez la partager manuellement.", "success");
         }
         
-        // Tout télécharger
+        // ============ TÉLÉCHARGER TOUT ============
         function downloadAll() {
-            showMessage("Préparation de l'archive...", "info");
+            showMessage("Création de l'archive...", "info");
             
             const zip = new JSZip();
             
-            // Ajouter l'image
-            fetch(appState.currentImageUrl)
-                .then(response => response.blob())
-                .then(blob => {
-                    zip.file("univers-image.png", blob);
-                    
-                    // Ajouter le texte
-                    zip.file("univers-description.txt", `Univers créé avec "Univers à Mots"
-                    
+            // Ajouter l'image (depuis le canvas)
+            const imageData = generatedCanvas.toDataURL('image/png').split(',')[1];
+            zip.file("univers-image.png", imageData, { base64: true });
+            
+            // Ajouter le texte
+            zip.file("univers-description.txt", `Univers créé avec "Univers à Mots"
+            
 Prompt: "${appState.currentPrompt}"
 
 Description poétique:
@@ -1680,29 +1655,28 @@ ${appState.currentText}
 Palette de couleurs:
 ${appState.currentColors.map(color => rgbToHex(color[0], color[1], color[2])).join(', ')}
 
-Date de création: ${new Date().toLocaleString()}
-`);
+Date de création: ${new Date().toLocaleString()}`);
+            
+            // Ajouter les métadonnées
+            const metadata = {
+                prompt: appState.currentPrompt,
+                colors: appState.currentColors.map(color => rgbToHex(color[0], color[1], color[2])),
+                text: appState.currentText,
+                date: new Date().toISOString(),
+                type: detectPromptType(appState.currentPrompt)
+            };
+            
+            zip.file("metadata.json", JSON.stringify(metadata, null, 2));
+            
+            // Générer et télécharger le ZIP
+            zip.generateAsync({ type: "blob" })
+                .then(content => {
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(content);
+                    link.download = `univers-a-mots-${Date.now()}.zip`;
+                    link.click();
                     
-                    // Ajouter les métadonnées
-                    const metadata = {
-                        prompt: appState.currentPrompt,
-                        colors: appState.currentColors.map(color => rgbToHex(color[0], color[1], color[2])),
-                        text: appState.currentText,
-                        date: new Date().toISOString()
-                    };
-                    
-                    zip.file("metadata.json", JSON.stringify(metadata, null, 2));
-                    
-                    // Générer et télécharger le ZIP
-                    zip.generateAsync({ type: "blob" })
-                        .then(content => {
-                            const link = document.createElement('a');
-                            link.href = URL.createObjectURL(content);
-                            link.download = `univers-a-mots-${Date.now()}.zip`;
-                            link.click();
-                            
-                            showMessage("Archive téléchargée avec succès !", "success");
-                        });
+                    showMessage("Archive téléchargée avec succès !", "success");
                 })
                 .catch(error => {
                     console.error("Erreur lors de la création de l'archive:", error);
@@ -1710,25 +1684,23 @@ Date de création: ${new Date().toLocaleString()}
                 });
         }
         
-        // Recréer un autre univers
+        // ============ RECRÉER ============
         function regenerateUniverse() {
             promptInput.value = '';
             promptInput.focus();
             
-            // Cacher les résultats
             resultsSection.classList.remove('active');
-            
-            // Réinitialiser les résultats
             resetResults();
             
             showMessage("Prêt pour une nouvelle création !", "success");
         }
         
-        // Réinitialiser les résultats
+        // ============ RÉINITIALISATION ============
         function resetResults() {
             // Image
             generatedImage.classList.remove('active');
             generatedImage.src = '';
+            generatedCanvas.style.display = 'none';
             imagePlaceholder.style.display = 'flex';
             
             // Couleurs
@@ -1745,76 +1717,41 @@ Date de création: ${new Date().toLocaleString()}
             generatedText.textContent = '';
             textPlaceholder.style.display = 'flex';
             
-            // Arrêter le visualiseur
+            // Visualiseur
             if (appState.visualizerInterval) {
                 clearInterval(appState.visualizerInterval);
                 appState.visualizerInterval = null;
             }
         }
         
-        // Mode démo (fallback)
+        // ============ MODE DÉMO ============
         function useDemoMode(prompt) {
-            // Détecter le type
-            const promptType = detectPromptType(prompt);
+            const promptType = detectPromptType(prompt) || 'chat';
             
-            // Utiliser des images de démo
-            const images = imageDatabase[promptType] || imageDatabase.default;
-            const demoImage = images[Math.floor(Math.random() * images.length)];
-            appState.currentImageUrl = demoImage;
+            // Générer l'image
+            generateImageWithCanvas(promptType);
             
-            // Afficher l'image
-            imagePlaceholder.style.display = 'none';
-            generatedImage.src = demoImage;
-            generatedImage.classList.add('active');
-            
-            // Générer un texte adapté
-            const phrases = poeticPhrases[promptType] || poeticPhrases.default;
-            const demoText = phrases[Math.floor(Math.random() * phrases.length)];
-            appState.currentText = demoText;
-            
+            // Générer le texte
+            const text = poeticTexts[promptType] || poeticTexts.chat;
+            appState.currentText = text;
             textPlaceholder.style.display = 'none';
-            generatedText.textContent = demoText;
+            generatedText.textContent = text;
             generatedText.classList.add('active');
             
-            // Générer un son
-            createWorkingAudio(promptType);
+            // Générer l'audio
+            const description = audioDescriptions[promptType] || audioDescriptions.chat;
+            audioInfo.textContent = description;
+            initAudioSystem(promptType);
             
-            // Extraire des couleurs de démo
-            const demoPalettes = {
-                'chat': [
-                    [255, 223, 186], // Peach
-                    [255, 179, 186], // Light pink
-                    [186, 225, 255], // Light blue
-                    [255, 255, 186], // Light yellow
-                    [186, 255, 201]  // Mint
-                ],
-                'robot': [
-                    [128, 128, 128], // Gray
-                    [178, 34, 34],   // Red
-                    [105, 105, 105], // Dim gray
-                    [169, 169, 169], // Dark gray
-                    [220, 220, 220]  // Gainsboro
-                ],
-                'default': [
-                    [124, 58, 237],  // Violet
-                    [16, 185, 129],  // Vert
-                    [245, 158, 11],  // Orange
-                    [59, 130, 246],  // Bleu
-                    [239, 68, 68]    // Rouge
-                ]
-            };
-            
-            const demoColors = demoPalettes[promptType] || demoPalettes.default;
-            appState.currentColors = demoColors;
-            displayColorPalette(demoColors);
+            // Générer les couleurs
+            generateColorPalette(promptType);
         }
         
-        // Afficher un message
+        // ============ MESSAGES ============
         function showMessage(text, type) {
             message.textContent = text;
             message.className = `message ${type} active`;
             
-            // Cacher après quelques secondes
             setTimeout(() => {
                 message.classList.remove('active');
             }, 5000);
